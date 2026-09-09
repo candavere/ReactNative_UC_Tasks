@@ -30,7 +30,7 @@ export default function SecondScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.confirmationText}>You have successfully navigated!</Text>
+      <Text style={styles.confirmationText}>Successfully navigated!</Text>
       <Text style={styles.visitText}>Visit count: {visitCount}</Text>
       <Button title="Go Back" onPress={handleGoBack} />
     </View>

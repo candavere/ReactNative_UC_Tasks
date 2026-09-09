@@ -34,7 +34,7 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.welcomeText}>Welcome to React Native!</Text>
+      <Text style={styles.welcomeText}>React Native - Task 0</Text>
       <Button title="Let's Start" onPress={handleStartPress} />
       <Text style={styles.counterText}>Button pressed {buttonPresses} time(s)</Text>
     </View>
