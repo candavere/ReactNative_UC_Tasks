@@ -8,38 +8,31 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 
 import FormBanner from '../components/FormBanner';
 import FormField from '../components/FormField';
 import PrimaryButton, { TextLink } from '../components/PrimaryButton';
 import ShowPasswordToggle from '../components/ShowPasswordToggle';
-import { getEmailError, getPasswordError } from '../validation';
+import { getEmailError, getPasswordError, normalizeEmail } from '../validation';
+import { getLoginErrorMessage } from '../authErrors';
+import { auth } from '../firebaseConfig';
 import { colors, fontSizes, spacing } from '../theme';
 
 export default function LoginScreen({ navigation }) {
-  // --- What the user has typed -------------------------------------------
-  // This is the only place the raw input is stored.
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  // --- Whether the user has interacted with each field -------------------
-  // `touched` becomes true on blur, or on the first keystroke. It stops the
-  // form from shouting "email is required" at somebody who has not typed yet.
   const [emailTouched, setEmailTouched] = useState(false);
   const [passwordTouched, setPasswordTouched] = useState(false);
-
-  // True once the user has tried to submit at least once.
   const [submitAttempted, setSubmitAttempted] = useState(false);
 
-  // --- UI state -----------------------------------------------------------
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState('');
 
-  // --- Derived values -----------------------------------------------------
-  // These are calculated from the state above on every render rather than
-  // stored in their own state. That way the error message can never disagree
-  // with what is actually in the box.
+  // Derived on every render from the state above, so an error message can never
+  // disagree with what is actually in the box.
   const emailError =
     emailTouched || submitAttempted ? getEmailError(email) : '';
   const passwordError =
@@ -48,15 +41,41 @@ export default function LoginScreen({ navigation }) {
   const formIsValid = emailError === '' && passwordError === '';
 
   async function handleLogin() {
-    // Stage 4 replaces the body of this function with the real Firebase call.
     setSubmitAttempted(true);
+    setFormError('');
+    setLoading(true);
+
+    try {
+      // This is the "check the user's credentials" step from the brief.
+      //
+      // The password is sent over HTTPS to Firebase, which hashes it and
+      // compares that hash with the one it stored when the account was created.
+      // The plain password is never written to Firestore and never comes back
+      // out of Firebase.
+      //
+      // If the email is not registered, or the password does not match, this
+      // promise rejects and we stay on this screen with an error.
+      await signInWithEmailAndPassword(auth, normalizeEmail(email), password);
+
+      // Reached only when Firebase accepted the email and password. We do not
+      // read a list of users or compare anything ourselves.
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Home' }],
+      });
+    } catch (error) {
+      setFormError(getLoginErrorMessage(error));
+    } finally {
+      // Always clears the spinner, whether the login worked or not.
+      setLoading(false);
+    }
   }
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       {/* KeyboardAvoidingView lifts the form so the on-screen keyboard does not
-          cover the fields or the button. Behaviour differs by platform: iOS
-          needs padding, Android can resize the window itself. */}
+          cover the fields or the button. iOS needs padding; Android resizes the
+          window itself. */}
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -79,8 +98,6 @@ export default function LoginScreen({ navigation }) {
             onBlur={() => setEmailTouched(true)}
             error={emailError}
             placeholder="example@domain.com"
-            // An email keyboard gives the user an @ key. Turning off
-            // auto-capitalise stops "Example@..." being typed for them.
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
@@ -99,7 +116,8 @@ export default function LoginScreen({ navigation }) {
             onBlur={() => setPasswordTouched(true)}
             error={passwordError}
             placeholder="At least 6 characters"
-            // secureTextEntry is what draws the dots instead of the letters.
+            // secureTextEntry draws dots instead of the typed characters, and
+            // the Show/Hide control flips it.
             secureTextEntry={!showPassword}
             autoCapitalize="none"
             autoCorrect={false}
@@ -115,13 +133,15 @@ export default function LoginScreen({ navigation }) {
             }
           />
 
+          {/* Backend errors sit here, directly above the button and below the
+              two fields, so the reason for the failure is never far away. */}
           <FormBanner message={formError} />
 
           <PrimaryButton
             title="Login"
             onPress={handleLogin}
-            // The button is genuinely disabled, not just greyed out, so it
-            // cannot be triggered by an accidental double tap.
+            // Genuinely disabled, not just greyed out, so a stray double tap
+            // cannot fire a request with an invalid form.
             disabled={!formIsValid}
             loading={loading}
             testID="login-submit"

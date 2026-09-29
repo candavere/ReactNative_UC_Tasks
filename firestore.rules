@@ -1,0 +1,89 @@
+rules_version = '2';
+
+// Cloud Firestore security rules for Task 1.
+//
+// HOW TO DEPLOY
+//   1. Firebase console > your project > Firestore Database > Rules tab
+//   2. Select "Production mode" (NOT test mode)
+//   3. Paste the whole contents of this file into the editor
+//   4. Click Publish
+//
+// WHY THESE RULES EXIST
+//   The handout says to keep user credentials in Firestore. Storing passwords
+//   there would be a serious mistake: anyone who can read the database, or
+//   anyone who intercepts the traffic, would be able to read every password.
+//   Firestore is a plain document store - it has no concept of a secret.
+//
+//   So the split is:
+//     * Firebase Authentication owns the password. The password is hashed on
+//       Firebase's servers and never sent to, or stored in, Firestore.
+//     * Firestore only holds a small, non-sensitive profile per user: the
+//       normalised email address and the date the account was created.
+//
+//   These rules are what stop one user reading or editing anybody else's data.
+//   They are the real security boundary - the Firebase client config in .env
+//   is public and protects nothing on its own.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ------------------------------------------------------------------
+    // User profiles
+    //
+    // Each account gets exactly one document at users/{their-own-uid}.
+    // The {userId} wildcard matches any document ID, and the check
+    // `request.auth.uid == userId` is what forces it to match the signed-in
+    // user's own ID. That single comparison is the whole permission check.
+    // ------------------------------------------------------------------
+    match /users/{userId} {
+
+      // A signed-in user may read their own profile.
+      // A user who is not signed in gets nothing, because request.auth is null.
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      // A signed-in user may create their own profile, but ONLY with the two
+      // fields this app actually writes, and only with the correct types.
+      //
+      // Without the hasOnly() check, a malicious client could write anything it
+      // liked into its own document - a "role": "admin" field, for example.
+      // Firestore rules are not a schema, so they have to be told what is
+      // allowed explicitly.
+      allow create: if request.auth != null
+                    && request.auth.uid == userId
+                    && request.resource.data.keys().hasOnly(['email', 'createdAt'])
+                    && request.resource.data.email is string
+                    && request.resource.data.email.size() > 0
+                    && request.resource.data.email.size() <= 254
+                    && request.resource.data.createdAt is timestamp;
+
+      // On update, the email and createdAt fields must both still be there and
+      // still be the right type. Note this allows the owner to change their own
+      // email or createdAt value; that is acceptable here because the document
+      // contains nothing sensitive. What is NOT allowed is adding any other
+      // field, which the hasOnly() check prevents.
+      allow update: if request.auth != null
+                    && request.auth.uid == userId
+                    && request.resource.data.keys().hasOnly(['email', 'createdAt'])
+                    && request.resource.data.email is string
+                    && request.resource.data.email.size() > 0
+                    && request.resource.data.email.size() <= 254
+                    && request.resource.data.createdAt is timestamp;
+
+      // This app has no delete feature, so deletion is refused outright.
+      allow delete: if false;
+    }
+
+    // ------------------------------------------------------------------
+    // Everything else is closed.
+    //
+    // This catch-all sits last. Firestore rules are not "deny by default" in
+    // the way a firewall is, so without this block any other collection in the
+    // database would simply have no rule allowing it - and unmatched requests
+    // are denied anyway. Writing it explicitly makes the intent obvious and
+    // means that adding a collection later cannot accidentally open it up.
+    // ------------------------------------------------------------------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

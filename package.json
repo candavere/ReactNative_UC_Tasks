@@ -7,7 +7,9 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "test": "node scripts/test-validation.mjs",
+    "verify:firebase": "node scripts/verify-firebase-rules.mjs"
   },
   "dependencies": {
     "@react-native-masked-view/masked-view": "0.3.2",

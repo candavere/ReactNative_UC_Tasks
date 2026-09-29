@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -8,6 +8,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import LoginScreen from './screens/LoginScreen';
 import SignupScreen from './screens/SignupScreen';
 import HomeScreen from './screens/HomeScreen';
+import LoadingView from './components/LoadingView';
 import { auth, isFirebaseConfigured } from './firebaseConfig';
 import { colors, fontSizes, spacing } from './theme';
 
@@ -42,12 +43,7 @@ function RootNavigator() {
   // Still talking to Firebase - show a spinner instead of flashing the wrong
   // screen.
   if (user === undefined) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.centeredText}>Checking your session…</Text>
-      </View>
-    );
+    return <LoadingView message="Checking your session…" />;
   }
 
   return (
@@ -135,13 +131,6 @@ export default function App() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: colors.background,
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.lg,
     backgroundColor: colors.background,
   },
   centeredText: {
