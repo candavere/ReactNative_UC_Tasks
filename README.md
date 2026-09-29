@@ -244,9 +244,9 @@ Every file in the project, and what it is for.
 | `screens/HomeScreen.js` | Shows the signed-in email and signup date, plus Logout. |
 | `components/FormField.js` | A labelled input with an error message underneath. |
 | `components/FormBanner.js` | The red banner for whole-form errors from the backend. |
-| `components/PrimaryButton.js` | The main button, plus the `TextLink` used for "Sign up" / "Log in". |
+| `components/PrimaryButton.js` | The main button, plus the `TextLink` used for "Sign up" / "Log in". Swaps its label for a spinner while `loading` is true. |
 | `components/ShowPasswordToggle.js` | The Show / Hide control for the password field. |
-| `components/LoadingView.js` | Centred message with a spinner, used while the session is checked. |
+| `components/LoadingView.js` | Centred plain-text message shown while Firebase reports whether a session already exists. It deliberately contains no spinner — the spinners live in `PrimaryButton`, where a request is actually in flight. |
 
 ### Why so many small files?
 
@@ -279,7 +279,9 @@ state in this app is four `useState` hooks per screen, which is easy to follow.
 3. The **Login** button is genuinely `disabled` while the form is invalid, so a
    stray double tap cannot fire a request.
 4. **Show / Hide** toggles `secureTextEntry`.
-5. While the request is in flight the button shows a spinner.
+5. While the request is in flight the button swaps its label for a spinner
+   (`ActivityIndicator`), stays disabled so it cannot be double-submitted, and
+   keeps exactly the same height so nothing jumps.
 6. On success: `navigation.reset` to Home. On failure: a banner above the button
    explaining what went wrong.
 
@@ -319,7 +321,40 @@ Three things stop a signed-out user from reaching Home with the Back button:
 
 ---
 
-## 9. Validation rules
+## 9. The two brownie-task features
+
+The brief lists two extra features. Here is exactly where each one lives.
+
+**Show / Hide password toggle** — `components/ShowPasswordToggle.js`. It is
+rendered as the right-hand adornment of the password field
+(`rightAdornment` on `components/FormField.js`) and flips a single piece of
+state, `showPassword`. The input's `secureTextEntry={!showPassword}` does the
+actual masking. The control carries `accessibilityLabel` and
+`accessibilityState.selected`, so a screen reader announces "Hide password" when
+the password is visible.
+
+**Loading indicator** — `components/PrimaryButton.js`. When `loading` is true the
+button renders an `ActivityIndicator` in place of the title. Two details worth
+knowing:
+
+- *The button does not change size.* The text and the spinner both sit inside a
+  `styles.buttonContent` row with `minHeight: 20`, and `styles.buttonText` pins
+  `lineHeight: 20` to match. Measured across the transition, the button was
+  exactly 52px in every one of 566 samples on Login and Signup.
+- *The spinner colour depends on the variant.* The primary button is filled
+  blue so the spinner is white; the secondary button (Logout) is transparent
+  with a blue outline, so there the spinner is blue — a white spinner would have
+  been invisible. See `spinnerColor` in `PrimaryButton.js`.
+
+`loading` is owned by the screens, not the button: `LoginScreen` sets it around
+`await signInWithEmailAndPassword`, and `SignupScreen` sets it around **both**
+`createUserWithEmailAndPassword` and `saveUserProfile`, so the spinner covers
+the whole two-step signup. Both clear it in a `finally` block, so it cannot get
+stuck on if the request throws.
+
+---
+
+## 10. Validation rules
 
 **Email** — trimmed, then checked against
 `/^[^\s@]+@[^\s@]+\.[^\s@]+$/`. This is a practical check, not a full RFC 5322
@@ -349,7 +384,7 @@ There is no `isValid` state that could fall out of sync with the inputs.
 
 ---
 
-## 10. What was tested, and what was not
+## 11. What was tested, and what was not
 
 Full record in **[`TESTING.md`](./TESTING.md)**, including the exact commands, the
 results, the two bugs that testing found, and an explicit list of what was *not*
@@ -362,7 +397,7 @@ Short version:
 | Validation rules | 25/25 automated assertions pass (`npm test`) |
 | Expo project health | 21/21 `expo-doctor` checks pass |
 | Firebase Auth + Firestore rules, live | 13/13 pass (`npm run verify:firebase`) |
-| Login / Signup / Home, driven in the browser | 21 checks, 20 pass, 1 partial |
+| Login / Signup / Home, driven in the browser | 28 checks, 27 pass, 1 partial |
 | Bugs found and fixed during testing | 2 (see `TESTING.md` section 3) |
 
 **Not verified, and worth checking on a real phone:**
@@ -371,13 +406,12 @@ Short version:
 - **Narrow / phone-width layout** — the automated browser could not be resized
   to a phone viewport, so only desktop width was inspected.
 - **On-screen keyboard** behaviour, which web does not have.
-- The **loading spinner** animation.
 - The **partial-signup retry path** (Auth succeeds, Firestore write fails),
   because triggering it would mean deliberately breaking the security rules.
 
 ---
 
-## 11. Running the tests yourself
+## 12. Running the tests yourself
 
 ```bash
 npm test              # validation rules, no network, instant
@@ -393,7 +427,7 @@ npx expo-doctor        # project health
 
 ---
 
-## 12. Known limitations
+## 13. Known limitations
 
 Stated plainly, so none of these come as a surprise in a viva.
 

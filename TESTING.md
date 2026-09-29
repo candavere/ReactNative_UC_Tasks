@@ -110,6 +110,7 @@ back from the rendered page.
 | 19 | **Logout** returns to Login | PASS | "SIGNED IN" gone, "Welcome back" shown |
 | 20 | Session survives a page reload | PASS | reloaded, still signed in, went straight to Home |
 | 21 | Back cannot reach Home | **PARTIAL** | see note below |
+| 22–28 | Loading indicator (spinner) — 7 checks | PASS | see the "Loading indicator" section below |
 
 ### Note on test 21 (back button)
 
@@ -121,6 +122,44 @@ disables the swipe-back gesture, and `onAuthStateChanged` resets the stack to
 Login whenever the session ends, but the **native hardware back button was not
 tested**. This is listed in the README as a device check to perform.
 
+### Loading indicator (re-tested 29 September 2026, after the spinner fix)
+
+The brief's brownie task asks for a visible loading indicator when Login or
+Signup is pressed. The first version only disabled the button and drew nothing.
+`components/PrimaryButton.js` now renders an `ActivityIndicator` in place of the
+title whenever `loading` is true.
+
+The spinner is brief, so it was measured with a `MutationObserver` / 20 ms poller
+rather than by eyeballing a screenshot, and the button height was sampled
+continuously across the transition.
+
+| # | Check | Result | Evidence |
+| --- | --- | --- | --- |
+| 22 | Login shows a spinner while the Firebase call is in flight | PASS | `data-testid="login-submit-spinner"`, `role="progressbar"` observed |
+| 23 | Signup shows a spinner while the Firebase call is in flight | PASS | `data-testid="signup-submit-spinner"` observed, 101 samples |
+| 24 | Logout (secondary variant) shows a spinner | PASS | `data-testid="logout-button-spinner"` observed |
+| 25 | **Button height does not change** between idle and loading | PASS | Login/Signup: **all 465 + 101 samples measured exactly 52px**. Logout: 54px in both states (2px extra from its 1px border) |
+| 26 | Button is genuinely disabled while loading | PASS | `aria-disabled="true"` and the `disabled` attribute present during the request |
+| 27 | Button keeps its accessible name while loading | PASS | `aria-label="Login"` / `aria-label="Signup"` present, since the title text is replaced by the spinner |
+| 28 | Spinner is visible against the button background | PASS | Login: white on the blue fill. Logout: `stroke: rgb(31, 79, 216)` (`#1F4FD8`) on transparent — a white spinner would have been invisible there |
+
+A screenshot of the Login spinner in flight was also captured.
+
+Two notes recorded honestly:
+
+- React Native Web does **not** render an `aria-busy` attribute from
+  `accessibilityState.busy`. It was checked in the live DOM during loading and
+  the attribute was absent. The `busy` flag is still passed because it is the
+  correct React Native API, but no web accessibility claim is made for it. The
+  loading state is actually conveyed by the `disabled` attribute and by the
+  `role="progressbar"` spinner itself.
+- The `loading` state on both screens was already wired correctly before this
+  change and did not need altering: `LoginScreen` sets it immediately before
+  `await signInWithEmailAndPassword` and clears it in `finally`; `SignupScreen`
+  does the same around both `createUserWithEmailAndPassword` **and**
+  `saveUserProfile`, so the spinner covers the whole two-step signup. The gap
+  was only that `PrimaryButton` never drew anything.
+
 ### Not tested
 
 - **Narrow / phone-width layout.** The headless browser used here could not be
@@ -129,10 +168,6 @@ tested**. This is listed in the README as a device check to perform.
   `ScrollView`, but this needs a real check on a phone.
 - **On-screen keyboard behaviour** (`KeyboardAvoidingView`) — web has no
   software keyboard.
-- **The loading spinner** was not captured in a screenshot. It is wired up via
-  `ActivityIndicator` inside `PrimaryButton` with `accessibilityState.busy`, and
-  the button is disabled while `loading` is true, but the animation itself was
-  not observed.
 - **The partial-signup retry path** (Auth succeeds, Firestore write fails) was
   not triggered, because forcing a Firestore write to fail would mean breaking
   the security rules. The code path exists and is described in the README, but it
