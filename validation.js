@@ -1,52 +1,25 @@
-/**
- * Email and password validation rules.
- *
- * These live in their own file because both Login and Signup use exactly the
- * same two rules. Keeping them here means the rule is written once, so Login
- * and Signup can never accidentally disagree with each other.
- */
-
-// A deliberately simple, practical email check: something, then @, then
-// something, then a dot, then something. None of the parts may contain spaces.
-//
-// This is not a full RFC 5322 email parser, and it does not need to be. Writing
-// a correct email parser is famously hard, and the only real test of an address
-// is whether mail can be delivered to it. Firebase performs its own server-side
-// check, so anything this lets through is still validated by Firebase.
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const UPPERCASE_PATTERN = /[A-Z]/;
+const LOWERCASE_PATTERN = /[a-z]/;
+const DIGIT_PATTERN = /[0-9]/;
+const SPECIAL_PATTERN = /[^A-Za-z0-9]/;
+const WHITESPACE_PATTERN = /\s/;
 
-// Firebase Authentication requires at least 6 characters.
-const MIN_PASSWORD_LENGTH = 6;
+export const SIGNUP_PASSWORD_MIN = 8;
+export const SIGNUP_PASSWORD_MAX = 64;
 
-/**
- * Turns what the user typed into the form Firebase wants.
- *
- * People often type a trailing space or capitalise the first letter by accident.
- * Trimming and lower-casing means "  Test@Example.com " and "test@example.com"
- * are treated as the same account, which stops a user being told their email is
- * already taken when it is actually their own typing.
- */
 export function normalizeEmail(rawEmail) {
   return rawEmail.trim().toLowerCase();
 }
 
-/** True if the email looks like a usable email address. */
 export function isEmailValid(rawEmail) {
   return EMAIL_PATTERN.test(rawEmail.trim());
 }
 
-/**
- * True if the password is long enough.
- *
- * The password is measured exactly as typed. We deliberately do NOT trim it or
- * change its case, because every character is part of the password - a leading
- * space or a capital letter is a real part of what the user chose.
- */
-export function isPasswordValid(password) {
-  return password.length >= MIN_PASSWORD_LENGTH;
+export function isLoginPasswordPresent(password) {
+  return password.length > 0;
 }
 
-/** The message shown under the email field. */
 export function getEmailError(rawEmail) {
   if (rawEmail.length === 0) {
     return 'Email is required.';
@@ -57,15 +30,81 @@ export function getEmailError(rawEmail) {
   return '';
 }
 
-/** The message shown under the password field. */
-export function getPasswordError(password) {
+export function getLoginPasswordError(password) {
   if (password.length === 0) {
     return 'Password is required.';
-  }
-  if (!isPasswordValid(password)) {
-    return `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
   }
   return '';
 }
 
-export { MIN_PASSWORD_LENGTH };
+export const PASSWORD_RULES = [
+  {
+    id: 'length',
+    label: 'At least 8 characters',
+    isMet: (password) => password.length >= SIGNUP_PASSWORD_MIN,
+  },
+  {
+    id: 'uppercase',
+    label: 'One uppercase letter',
+    isMet: (password) => UPPERCASE_PATTERN.test(password),
+  },
+  {
+    id: 'lowercase',
+    label: 'One lowercase letter',
+    isMet: (password) => LOWERCASE_PATTERN.test(password),
+  },
+  {
+    id: 'digit',
+    label: 'One number',
+    isMet: (password) => DIGIT_PATTERN.test(password),
+  },
+  {
+    id: 'special',
+    label: 'One special character',
+    isMet: (password) => SPECIAL_PATTERN.test(password),
+  },
+  {
+    id: 'noSpaces',
+    label: 'No spaces',
+    isMet: (password) => !WHITESPACE_PATTERN.test(password),
+  },
+  {
+    id: 'maxLength',
+    label: 'No more than 64 characters',
+    isMet: (password) => password.length <= SIGNUP_PASSWORD_MAX,
+  },
+];
+
+export function getPasswordRuleResults(password) {
+  return PASSWORD_RULES.map((rule) => ({
+    id: rule.id,
+    label: rule.label,
+    isMet: rule.isMet(password),
+  }));
+}
+
+export function isSignupPasswordValid(password) {
+  return PASSWORD_RULES.every((rule) => rule.isMet(password));
+}
+
+export function getSignupPasswordError(password) {
+  const unmet = PASSWORD_RULES.filter((rule) => !rule.isMet(password));
+  if (unmet.length === 0) {
+    return '';
+  }
+  return unmet[0].label;
+}
+
+export function passwordsMatch(password, confirmation) {
+  return confirmation.length > 0 && password === confirmation;
+}
+
+export function getConfirmPasswordError(password, confirmation) {
+  if (confirmation.length === 0) {
+    return 'Confirm your password.';
+  }
+  if (password !== confirmation) {
+    return 'Passwords do not match.';
+  }
+  return '';
+}

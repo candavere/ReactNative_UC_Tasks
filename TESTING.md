@@ -19,15 +19,17 @@ assumed to work.
 
 ## 1. Automated tests
 
-### Validation rules — 25/25 passed
+### Validation rules — 94/94 passed
 
 ```
 $ npm test          # node scripts/test-validation.mjs
 ```
 
-Covers 5 valid email formats, 8 invalid email formats, the 5/6/7-character
-password boundary, whitespace-only passwords, email normalisation, and all six
-error messages.
+Covers 5 valid email formats, 8 invalid email formats, email normalisation, the
+login presence-only rule, all seven signup password rules with their pass and
+fail cases, the 7/8 and 64/65 length boundaries, 14 different special characters,
+spaces / tabs / newlines, and confirm-password matching (including case and
+whitespace sensitivity).
 
 ### Theme import check — passed
 
@@ -112,6 +114,7 @@ back from the rendered page.
 | 21 | Back cannot reach Home | **PARTIAL** | see note below |
 | 22–28 | Loading indicator (spinner) — 7 checks | PASS | see the "Loading indicator" section below |
 | 29–39 | Orientation and resizing — 11 checks | PASS | see the "Orientation and resizing" section below |
+| 40–49 | Signup password rules and visual polish — 10 checks | PASS | see the "Signup password rules and visual polish" section below |
 
 ### Note on test 21 (back button)
 
@@ -139,7 +142,7 @@ continuously across the transition.
 | 22 | Login shows a spinner while the Firebase call is in flight | PASS | `data-testid="login-submit-spinner"`, `role="progressbar"` observed |
 | 23 | Signup shows a spinner while the Firebase call is in flight | PASS | `data-testid="signup-submit-spinner"` observed, 101 samples |
 | 24 | Logout (secondary variant) shows a spinner | PASS | `data-testid="logout-button-spinner"` observed |
-| 25 | **Button height does not change** between idle and loading | PASS | Login/Signup: **all 465 + 101 samples measured exactly 52px**. Logout: 54px in both states (2px extra from its 1px border) |
+| 25 | **Button height does not change** between idle and loading | PASS | Originally measured at exactly 52px. **Re-measured at 54px after the type-scale change** (the body line height went from 20 to 22, so 16 + 16 + 22 = 54), still identical in both states. Logout: 56px, 2px extra from its 1px border. |
 | 26 | Button is genuinely disabled while loading | PASS | `aria-disabled="true"` and the `disabled` attribute present during the request |
 | 27 | Button keeps its accessible name while loading | PASS | `aria-label="Login"` / `aria-label="Signup"` present, since the title text is replaced by the spinner |
 | 28 | Spinner is visible against the button background | PASS | Login: white on the blue fill. Logout: `stroke: rgb(31, 79, 216)` (`#1F4FD8`) on transparent — a white spinner would have been invisible there |
@@ -208,7 +211,30 @@ reachable.
 #### Measured while fixing that
 
 To be sure the spinner work had not regressed, the button height was sampled
-continuously across the loading transition. It remained exactly 52px, as before.
+continuously across the loading transition. After the type-scale change it
+measured exactly 54px in both states, so it still does not move.
+
+### Signup password rules and visual polish (re-tested 29 September 2026)
+
+Signup gained a seven-rule password policy, a Confirm password field with its
+own Show / Hide toggle, and a live checklist. Login deliberately did **not** gain
+the new rules.
+
+| # | Check | Result | Evidence |
+| --- | --- | --- | --- |
+| 40 | Signup password rules, automated | PASS | 94/94 assertions, including the 7/8/64/65 length boundaries, every special character, spaces, tabs, newlines, and confirm matching |
+| 41 | Checklist is empty-safe | PASS | with an empty password, "No spaces" and "No more than 64 characters" show Met, the other five show Not met |
+| 42 | Checklist flips live as the password is typed | PASS | `Abcdef1` → 4 met / 3 not met; `Abcdef1!` → 7 met / 0 not met |
+| 43 | Rule state is not colour-only | PASS | each row shows a `✓` or `•` mark **and** the words "Met" / "Not met" **and** a colour |
+| 44 | Signup button disabled until every rule passes | PASS | `aria-disabled="true"` at partial validity and on a confirm mismatch; absent and the button turns the accent blue when valid |
+| 45 | Confirm mismatch is reported | PASS | "Passwords do not match." under the confirm field, button still disabled |
+| 46 | Login does **not** apply the new rules | PASS | a 3-character password `abc` enables the Login button; no checklist, no confirm field, only 2 inputs |
+| 47 | Login still shows the generic Firebase error | PASS | wrong password produced "Check your email and password, or sign up if you do not have an account yet." |
+| 48 | Signup still works end to end | PASS | a new account was created and `users/{uid}` was written — Home showed the email and "Member since" |
+| 49 | No horizontal overflow after the redesign | PASS | `scrollWidth` never exceeded the viewport on any screen at 390×844 or 844×390 |
+
+The button height was re-measured after the type scale changed: it is now 54px
+(16 + 16 + 22) in both the idle and loading states, still not moving.
 
 ### Not tested
 
@@ -264,7 +290,16 @@ const formIsValid = isEmailValid(email) && isPasswordValid(password);
 
 Confirmed fixed by test 3 and test 8 above.
 
-### Bug 3 — the form could not scroll in landscape
+### Bug 3 — the documentation showed the buggy validity derivation
+
+The README contained a code sample reading
+`const formIsValid = emailError === '' && passwordError === ''`, which is the
+version from Bug 2 — the one that left the button enabled on an empty form. The
+code was already fixed; the documentation was not, and would have described
+behaviour the app no longer had. Corrected to show the derivation that is
+actually used.
+
+### Bug 4 — the form could not scroll in landscape
 
 The React Navigation stack card is sized to its content, so the responsive layout
 grew past the viewport and the ScrollView never became scrollable. The bottom of

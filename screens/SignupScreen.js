@@ -4,15 +4,19 @@ import { createUserWithEmailAndPassword } from 'firebase/auth';
 
 import FormBanner from '../components/FormBanner';
 import FormField from '../components/FormField';
+import PasswordChecklist from '../components/PasswordChecklist';
 import PrimaryButton, { TextLink } from '../components/PrimaryButton';
 import Screen from '../components/Screen';
 import ShowPasswordToggle from '../components/ShowPasswordToggle';
 import {
+  getConfirmPasswordError,
   getEmailError,
-  getPasswordError,
+  getPasswordRuleResults,
+  getSignupPasswordError,
   isEmailValid,
-  isPasswordValid,
+  isSignupPasswordValid,
   normalizeEmail,
+  passwordsMatch,
 } from '../validation';
 import {
   getProfileSaveErrorMessage,
@@ -20,20 +24,21 @@ import {
 } from '../authErrors';
 import { auth } from '../firebaseConfig';
 import { saveUserProfile } from '../userProfile';
-import { colors, fontSizes, spacing } from '../theme';
-
-const SHORT_HEIGHT = 520;
+import { colors, shortHeight, spacing, typography } from '../theme';
 
 export default function SignupScreen({ navigation }) {
   const { height } = useWindowDimensions();
-  const isShort = height < SHORT_HEIGHT;
+  const isShort = height < shortHeight;
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [emailTouched, setEmailTouched] = useState(false);
   const [passwordTouched, setPasswordTouched] = useState(false);
+  const [confirmTouched, setConfirmTouched] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState('');
   const [profileSaveFailed, setProfileSaveFailed] = useState(false);
@@ -41,8 +46,17 @@ export default function SignupScreen({ navigation }) {
   const emailError =
     emailTouched || submitAttempted ? getEmailError(email) : '';
   const passwordError =
-    passwordTouched || submitAttempted ? getPasswordError(password) : '';
-  const formIsValid = isEmailValid(email) && isPasswordValid(password);
+    passwordTouched || submitAttempted ? getSignupPasswordError(password) : '';
+  const confirmError =
+    confirmTouched || submitAttempted
+      ? getConfirmPasswordError(password, confirmPassword)
+      : '';
+
+  const ruleResults = getPasswordRuleResults(password);
+  const formIsValid =
+    isEmailValid(email) &&
+    isSignupPasswordValid(password) &&
+    passwordsMatch(password, confirmPassword);
 
   async function handleSubmit() {
     setSubmitAttempted(true);
@@ -113,7 +127,7 @@ export default function SignupScreen({ navigation }) {
   if (profileSaveFailed) {
     return (
       <Screen testID="signup-retry-screen">
-        <Text style={[styles.title, isShort && styles.titleShort]}>
+        <Text style={[styles.title, isShort && styles.titleCompact]}>
           Almost done
         </Text>
         <Text style={styles.subtitle}>
@@ -139,7 +153,7 @@ export default function SignupScreen({ navigation }) {
 
   return (
     <Screen testID="signup-screen">
-      <Text style={[styles.title, isShort && styles.titleShort]}>
+      <Text style={[styles.title, isShort && styles.titleCompact]}>
         Create an account
       </Text>
       <Text style={styles.subtitle}>
@@ -173,8 +187,34 @@ export default function SignupScreen({ navigation }) {
         }}
         onBlur={() => setPasswordTouched(true)}
         error={passwordError}
-        placeholder="At least 6 characters"
+        placeholder="Create a strong password"
         secureTextEntry={!showPassword}
+        autoCapitalize="none"
+        autoCorrect={false}
+        autoComplete="new-password"
+        textContentType="newPassword"
+        returnKeyType="next"
+        rightAdornment={
+          <ShowPasswordToggle
+            visible={showPassword}
+            onPress={() => setShowPassword((current) => !current)}
+          />
+        }
+      />
+
+      <PasswordChecklist results={ruleResults} />
+
+      <FormField
+        label="Confirm password"
+        value={confirmPassword}
+        onChangeText={(text) => {
+          setConfirmPassword(text);
+          setConfirmTouched(true);
+        }}
+        onBlur={() => setConfirmTouched(true)}
+        error={confirmError}
+        placeholder="Type it again"
+        secureTextEntry={!showConfirmPassword}
         autoCapitalize="none"
         autoCorrect={false}
         autoComplete="new-password"
@@ -183,8 +223,9 @@ export default function SignupScreen({ navigation }) {
         onSubmitEditing={formIsValid ? handleSubmit : undefined}
         rightAdornment={
           <ShowPasswordToggle
-            visible={showPassword}
-            onPress={() => setShowPassword((current) => !current)}
+            visible={showConfirmPassword}
+            onPress={() => setShowConfirmPassword((current) => !current)}
+            label="confirm password"
           />
         }
       />
@@ -216,16 +257,15 @@ function isAuthError(error) {
 
 const styles = StyleSheet.create({
   title: {
-    fontSize: fontSizes.title,
-    fontWeight: '700',
+    ...typography.title,
     color: colors.text,
     textAlign: 'center',
   },
-  titleShort: {
-    fontSize: fontSizes.titleCompact,
+  titleCompact: {
+    ...typography.titleCompact,
   },
   subtitle: {
-    fontSize: fontSizes.body,
+    ...typography.body,
     color: colors.textMuted,
     textAlign: 'center',
     marginTop: spacing.xs,
@@ -236,17 +276,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     flexWrap: 'wrap',
-    marginTop: spacing.md,
+    marginTop: spacing.sm,
   },
   footerText: {
-    fontSize: fontSizes.body,
+    ...typography.body,
     color: colors.textMuted,
   },
   retryNote: {
     marginTop: spacing.md,
-    fontSize: fontSizes.label,
+    ...typography.caption,
     color: colors.textMuted,
     textAlign: 'center',
-    lineHeight: 20,
   },
 });

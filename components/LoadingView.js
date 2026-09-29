@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, fontSizes, spacing } from '../theme';
+import { colors, spacing, typography } from '../theme';
 
 export default function LoadingView({ message = 'Loading…' }) {
   return (
@@ -20,7 +20,7 @@ const styles = StyleSheet.create({
   },
   message: {
     marginTop: spacing.md,
-    fontSize: fontSizes.body,
+    ...typography.body,
     color: colors.textMuted,
     textAlign: 'center',
   },

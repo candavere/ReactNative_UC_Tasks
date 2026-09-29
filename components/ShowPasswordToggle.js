@@ -1,14 +1,16 @@
 import React from 'react';
 import { StyleSheet, Text } from 'react-native';
-import { colors, fontSizes, spacing } from '../theme';
+import { colors, spacing, touchTarget, typography } from '../theme';
 
-export default function ShowPasswordToggle({ visible, onPress }) {
+export default function ShowPasswordToggle({ visible, onPress, label = 'password' }) {
+  const accessibleLabel = visible ? `Hide ${label}` : `Show ${label}`;
+
   return (
     <Text
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected: visible }}
-      accessibilityLabel={visible ? 'Hide password' : 'Show password'}
+      accessibilityLabel={accessibleLabel}
       style={styles.toggle}
     >
       {visible ? 'Hide' : 'Show'}
@@ -18,10 +20,12 @@ export default function ShowPasswordToggle({ visible, onPress }) {
 
 const styles = StyleSheet.create({
   toggle: {
+    minHeight: touchTarget,
+    minWidth: touchTarget,
+    textAlign: 'center',
+    textAlignVertical: 'center',
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
     color: colors.primary,
-    fontSize: fontSizes.label,
-    fontWeight: '600',
+    ...typography.label,
   },
 });

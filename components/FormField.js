@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
-import { colors, fontSizes, spacing } from '../theme';
+import { colors, radii, spacing, touchTarget, typography } from '../theme';
 
 export default function FormField({
   label,
@@ -18,7 +18,9 @@ export default function FormField({
     <View style={styles.wrapper}>
       <Text style={styles.label}>{label}</Text>
 
-      <View style={[styles.inputRow, hasError && styles.inputRowError]}>
+      <View
+        style={[styles.inputRow, hasError && styles.inputRowError]}
+      >
         <TextInput
           style={[styles.input, hasError && styles.inputError]}
           value={value}
@@ -50,8 +52,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   label: {
-    fontSize: fontSizes.label,
-    fontWeight: '600',
+    ...typography.label,
     color: colors.text,
     marginBottom: spacing.xs,
   },
@@ -60,7 +61,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 10,
+    borderRadius: radii.md,
     backgroundColor: colors.card,
   },
   inputRowError: {
@@ -70,20 +71,20 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
-    fontSize: fontSizes.body,
+    ...typography.body,
     color: colors.text,
-    minHeight: 52,
+    minHeight: touchTarget + 4,
   },
   inputError: {
     backgroundColor: colors.errorBackground,
   },
   errorSlot: {
-    minHeight: 20,
+    minHeight: 18,
     justifyContent: 'center',
   },
   error: {
+    ...typography.caption,
     color: colors.error,
-    fontSize: fontSizes.error,
     marginTop: spacing.xs,
   },
 });

@@ -14,7 +14,7 @@ import SignupScreen from './screens/SignupScreen';
 import HomeScreen from './screens/HomeScreen';
 import LoadingView from './components/LoadingView';
 import { auth, isFirebaseConfigured } from './firebaseConfig';
-import { colors, fontSizes, spacing } from './theme';
+import { colors, spacing, typography } from './theme';
 
 const Stack = createStackNavigator();
 const navigationRef = createNavigationContainerRef();
@@ -117,24 +117,21 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
   },
   noticeTitle: {
-    fontSize: fontSizes.heading,
-    fontWeight: '700',
+    ...typography.titleCompact,
     color: colors.text,
     textAlign: 'center',
     marginBottom: spacing.md,
   },
   noticeText: {
-    fontSize: fontSizes.body,
+    ...typography.body,
     color: colors.textMuted,
     textAlign: 'center',
     marginBottom: spacing.lg,
-    lineHeight: 22,
   },
   noticeStep: {
-    fontSize: fontSizes.label,
+    ...typography.caption,
     color: colors.textMuted,
     textAlign: 'center',
     marginBottom: spacing.sm,
-    lineHeight: 20,
   },
 });

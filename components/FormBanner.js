@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, fontSizes, spacing } from '../theme';
+import { colors, radii, spacing, typography } from '../theme';
 
 export default function FormBanner({ message }) {
   if (!message) {
@@ -23,13 +23,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.errorBackground,
     borderLeftWidth: 4,
     borderLeftColor: colors.error,
-    borderRadius: 8,
+    borderRadius: radii.sm,
     padding: spacing.md,
     marginBottom: spacing.md,
   },
   bannerText: {
+    ...typography.body,
     color: colors.error,
-    fontSize: fontSizes.body,
-    lineHeight: 21,
   },
 });

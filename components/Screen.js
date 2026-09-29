@@ -8,15 +8,12 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, spacing } from '../theme';
-
-const CONTENT_MAX_WIDTH = 520;
-const SHORT_HEIGHT = 520;
+import { colors, contentMaxWidth, shortHeight, spacing } from '../theme';
 
 export default function Screen({ children, testID }) {
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
-  const isShort = height < SHORT_HEIGHT;
+  const isShort = height < shortHeight;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
@@ -64,7 +61,7 @@ const styles = StyleSheet.create({
   },
   inner: {
     width: '100%',
-    maxWidth: CONTENT_MAX_WIDTH,
+    maxWidth: contentMaxWidth,
     flexGrow: 1,
     justifyContent: 'center',
   },

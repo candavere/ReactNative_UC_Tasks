@@ -227,8 +227,8 @@ Every file in the project, and what it is for.
 | `App.js` | The navigator. Holds the auth-state listener that decides whether to start on Login or Home, and resets the stack to Login on sign-out. |
 | `app.json` | Expo app configuration. `orientation` is `default` so both portrait and landscape are allowed, `ios.requireFullScreen` is `false` so iPad Split View does not lock rotation, and `android.softwareKeyboardLayoutMode` is `resize`. |
 | `firebaseConfig.js` | Reads the six `EXPO_PUBLIC_FIREBASE_*` values from the environment and exports `auth`, `db` and `isFirebaseConfigured`. |
-| `theme.js` | Shared colours, spacing and font sizes, so the three screens stay consistent. |
-| `validation.js` | The email and password rules, and the messages shown for them. |
+| `theme.js` | The single source of typography (family, sizes, weights, line heights), colours, spacing, radii and touch-target sizes. |
+| `validation.js` | Pure functions: the email rules, the seven signup password rules, login's presence-only check, confirm-password matching, and the messages for each. |
 | `authErrors.js` | Turns Firebase error codes (`auth/email-already-in-use`, …) into readable sentences. |
 | `userProfile.js` | The only file that talks to Firestore. Saves and reads `users/{uid}`. |
 | `firestore.rules` | Firestore security rules. Deployed by hand through the console. |
@@ -248,6 +248,7 @@ Every file in the project, and what it is for.
 | `components/ShowPasswordToggle.js` | The Show / Hide control for the password field. |
 | `components/LoadingView.js` | Centred plain-text message shown while Firebase reports whether a session already exists. It deliberately contains no spinner — the spinners live in `PrimaryButton`, where a request is actually in flight. |
 | `components/Screen.js` | The responsive shell every screen uses: safe area, keyboard avoidance, and a scrolling, width-capped content column. |
+| `components/PasswordChecklist.js` | The live rule-by-rule checklist under the Signup password field. |
 
 ### Why so many small files?
 
@@ -349,7 +350,8 @@ All three screens render inside `components/Screen.js`, which does four things:
    `Dimensions.get('window')` at module load. A module-level read is taken once
    when the file is first evaluated and is never updated, so a rotation would
    leave the app sizing itself against stale numbers.
-2. **A scrolling column capped at 520px wide**, centred by
+2. **A scrolling column capped at 520px wide** (`contentMaxWidth` in `theme.js`),
+   centred by
    `alignItems: 'center'`. On a phone in portrait the form uses the full width;
    in landscape, or on a tablet, the extra width becomes margin instead of
    absurdly long input boxes.
@@ -403,9 +405,9 @@ button renders an `ActivityIndicator` in place of the title. Two details worth
 knowing:
 
 - *The button does not change size.* The text and the spinner both sit inside a
-  `styles.buttonContent` row with `minHeight: 20`, and `styles.buttonText` pins
-  `lineHeight: 20` to match. Measured across the transition, the button was
-  exactly 52px in every one of 566 samples on Login and Signup.
+  `styles.buttonContent` row with `minHeight: 22`, and `styles.buttonText` pins
+  `lineHeight: 22` to match `typography.body`. Measured across the transition,
+  the button was exactly 54px in every one of the samples taken.
 - *The spinner colour depends on the variant.* The primary button is filled
   blue so the spinner is white; the secondary button (Logout) is transparent
   with a blue outline, so there the spinner is blue — a white spinner would have
@@ -430,7 +432,33 @@ The email is also **lower-cased** before being sent, so ` Test@Example.com ` and
 `test@example.com` are the same account and a user is not told their own address
 is taken because of a stray capital letter.
 
-**Password** — at least 6 characters, which is Firebase's own minimum.
+**Password on Signup** — seven rules, checked live as you type and listed in a
+checklist under the password field:
+
+| Rule | Test |
+| --- | --- |
+| At least 8 characters | `password.length >= 8` |
+| One uppercase letter | `/[A-Z]/` |
+| One lowercase letter | `/[a-z]/` |
+| One number | `/[0-9]/` |
+| One special character | `/[^A-Za-z0-9]/` |
+| No spaces | `!/\s/` |
+| No more than 64 characters | `password.length <= 64` |
+
+Each rule is a separate entry in the `PASSWORD_RULES` array in `validation.js`,
+each holding its own label and its own `isMet` function, so the checklist and
+the validation can never disagree with each other. The checklist states each
+rule three ways — a `✓` or `•` mark, the words "Met" or "Not met", and a colour —
+so the state is never carried by colour alone.
+
+The 64-character cap matters because Firebase silently truncates longer passwords
+on some platforms, which would log the user out unexpectedly.
+
+**Password on Login** — only required to be non-empty. The signup rules are *not*
+applied at login. This is deliberate: these are the rules for *choosing* a new
+password, and they say nothing about whether an existing password is correct. The
+authoritative check is Firebase's, and a wrong password still produces the same
+generic message as an unknown email (see section 1).
 
 The password is **never trimmed and never changed**. Every character the user
 typed is part of the password, including a leading space or a capital letter.
@@ -438,32 +466,100 @@ The character count is measured on the raw value, and the raw value is what gets
 sent to Firebase.
 
 **Validity is derived, not stored.** The error strings are recalculated from the
-field values on every render:
+field values on every render, and validity is worked out from the values
+themselves:
 
 ```js
 const emailError = emailTouched || submitAttempted ? getEmailError(email) : '';
-const formIsValid = emailError === '' && passwordError === '';
+
+const formIsValid = isEmailValid(email) && isSignupPasswordValid(password);
 ```
 
-There is no `isValid` state that could fall out of sync with the inputs.
+Validity is deliberately **not** derived from the error strings. An untouched
+form shows no error messages, so "no error" would look identical to "valid" and
+would leave the button enabled on an empty form — that was a real bug, caught
+during testing. There is no `isValid` state that could fall out of sync with the
+inputs.
+
+**Confirm password** on Signup must match exactly, comparing case and
+whitespace. Its own Show / Hide toggle is independent of the password field's.
 
 ---
 
-## 12. What was tested, and what was not
+## 12. Typography and visual design
+
+### One type scale
+
+Every piece of text in the app takes its size, weight, line height and family
+from `typography` in `theme.js`. There are no `fontSize` values written in a
+screen or a component, which is why the app reads as one piece rather than three
+screens that each invented their own sizes.
+
+| Role | Size | Line height | Weight |
+| --- | --- | --- | --- |
+| `title` | 28 | 34 | 700 |
+| `titleCompact` | 22 | 28 | 700 |
+| `body` | 16 | 22 | 400 |
+| `label` | 14 | 20 | 600 |
+| `caption` | 13 | 18 | 400 |
+
+`titleCompact` exists only for short landscape windows, where the full title
+wastes vertical space the form needs.
+
+### The font family and the Android fallback
+
+The family is chosen per platform with `Platform.select`:
+
+```js
+export const fontFamily = Platform.select({
+  ios: 'Helvetica Neue',
+  web: 'Helvetica Neue, Helvetica, Arial, sans-serif',
+  android: 'sans-serif',
+  default: 'System',
+});
+```
+
+The Android value is `'sans-serif'` on purpose. React Native on Android resolves
+`fontFamily` through the Android typeface system, and `'sans-serif'` is that
+system's default UI font (Roboto). Naming a specific family such as
+`Helvetica Neue` on Android would either fall back silently to a default anyway
+or render with a substituted font, because Helvetica is not shipped with Android
+and licensing prevents bundling it. So each platform gets the closest thing to
+its own native system font, and the text looks native rather than borrowed.
+
+The web value is a *font stack*, not a single family, because a browser needs a
+fallback in case Helvetica Neue is not installed. On iOS, `'Helvetica Neue'` is
+present on every device.
+
+### Spacing, touch targets and colour
+
+- **Spacing** is a 4/8/16/24/32 scale in `theme.js`. Nothing uses an arbitrary
+  number.
+- **Touch targets** are at least 48px (`touchTarget` in `theme.js`). Inputs and
+  buttons are 52px; the Show / Hide control and the text link are 48px.
+- **One accent colour** — `#1F4FD8`. It is used for the primary button, links,
+  the toggle, the focus of the hierarchy and the "Signed in" badge. The error
+  red and success green are functional signals, not decoration.
+- **No gradients, no emoji, no illustrations.** Hierarchy comes from weight,
+  size and spacing instead.
+
+---
+
+## 13. What was tested, and what was not
 
 Full record in **[`TESTING.md`](./TESTING.md)**, including the exact commands, the
-results, the two bugs that testing found, and an explicit list of what was *not*
+results, the bugs that testing found, and an explicit list of what was *not*
 verified.
 
 Short version:
 
 | Area | Result |
 | --- | --- |
-| Validation rules | 25/25 automated assertions pass (`npm test`) |
+| Validation rules, including the 7 password rules | 94/94 automated assertions pass (`npm test`) |
 | Expo project health | 21/21 `expo-doctor` checks pass |
 | Firebase Auth + Firestore rules, live | 13/13 pass (`npm run verify:firebase`) |
-| Login / Signup / Home, driven in the browser | 39 checks, 38 pass, 1 partial |
-| Bugs found and fixed during testing | 3 (see `TESTING.md` section 3) |
+| Login / Signup / Home, driven in the browser | 47 checks, 46 pass, 1 partial |
+| Bugs found and fixed during testing | 4 (see `TESTING.md` section 3) |
 
 **Not verified, and worth checking on a real phone:**
 
@@ -475,7 +571,7 @@ Short version:
 
 ---
 
-## 13. Running the tests yourself
+## 14. Running the tests yourself
 
 ```bash
 npm test              # validation rules, no network, instant
@@ -491,7 +587,7 @@ npx expo-doctor        # project health
 
 ---
 
-## 14. Known limitations
+## 15. Known limitations
 
 Stated plainly, so none of these come as a surprise in a viva.
 

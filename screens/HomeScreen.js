@@ -6,13 +6,11 @@ import PrimaryButton from '../components/PrimaryButton';
 import Screen from '../components/Screen';
 import { auth } from '../firebaseConfig';
 import { formatFirestoreDate, getUserProfile } from '../userProfile';
-import { colors, fontSizes, spacing } from '../theme';
-
-const SHORT_HEIGHT = 520;
+import { colors, radii, shortHeight, spacing, typography } from '../theme';
 
 export default function HomeScreen() {
   const { height } = useWindowDimensions();
-  const isShort = height < SHORT_HEIGHT;
+  const isShort = height < shortHeight;
 
   const [profile, setProfile] = useState(null);
   const [profileError, setProfileError] = useState('');
@@ -63,7 +61,8 @@ export default function HomeScreen() {
           <Text style={styles.badgeText}>SIGNED IN</Text>
         </View>
 
-        <Text style={[styles.title, isShort && styles.titleShort]}>Home</Text>
+        <Text style={[styles.title, isShort && styles.titleCompact]}>Home</Text>
+
         <Text style={styles.label}>Email</Text>
         <Text style={styles.value}>{email}</Text>
 
@@ -74,7 +73,9 @@ export default function HomeScreen() {
           </>
         ) : null}
 
-        {profileError ? <Text style={styles.note}>{profileError}</Text> : null}
+        {profileError ? (
+          <Text style={styles.note}>{profileError}</Text>
+        ) : null}
       </View>
 
       <PrimaryButton
@@ -91,7 +92,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.card,
-    borderRadius: 16,
+    borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.lg,
@@ -99,44 +100,42 @@ const styles = StyleSheet.create({
   },
   badge: {
     alignSelf: 'flex-start',
-    backgroundColor: '#E7EDFB',
-    borderRadius: 999,
+    backgroundColor: colors.accentSoft,
+    borderRadius: radii.pill,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     marginBottom: spacing.md,
   },
   badgeText: {
-    color: colors.primary,
-    fontSize: 12,
+    ...typography.caption,
     fontWeight: '700',
+    color: colors.primary,
     letterSpacing: 0.5,
   },
   title: {
-    fontSize: fontSizes.title,
-    fontWeight: '700',
+    ...typography.title,
     color: colors.text,
     marginBottom: spacing.lg,
   },
-  titleShort: {
-    fontSize: fontSizes.titleCompact,
+  titleCompact: {
+    ...typography.titleCompact,
   },
   label: {
-    fontSize: fontSizes.label,
+    ...typography.caption,
     fontWeight: '600',
     color: colors.textMuted,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   value: {
-    fontSize: fontSizes.body,
+    ...typography.body,
     color: colors.text,
     marginTop: spacing.xs,
     marginBottom: spacing.md,
   },
   note: {
     marginTop: spacing.sm,
-    fontSize: fontSizes.label,
+    ...typography.caption,
     color: colors.textMuted,
-    lineHeight: 20,
   },
 });

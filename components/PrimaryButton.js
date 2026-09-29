@@ -1,6 +1,6 @@
 import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, fontSizes, spacing } from '../theme';
+import { colors, radii, spacing, touchTarget, typography } from '../theme';
 
 export default function PrimaryButton({
   title,
@@ -60,6 +60,7 @@ export function TextLink({ title, onPress }) {
     <Pressable
       onPress={onPress}
       accessibilityRole="link"
+      accessibilityLabel={title}
       style={({ pressed }) => [styles.linkWrapper, pressed && styles.linkPressed]}
     >
       <Text style={styles.link}>{title}</Text>
@@ -70,12 +71,12 @@ export function TextLink({ title, onPress }) {
 const styles = StyleSheet.create({
   button: {
     backgroundColor: colors.primary,
-    borderRadius: 10,
+    borderRadius: radii.md,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 52,
+    minHeight: touchTarget + 4,
   },
   buttonSecondary: {
     backgroundColor: 'transparent',
@@ -90,35 +91,37 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primaryPressed,
   },
   pressedSecondary: {
-    backgroundColor: '#E7EDFB',
+    backgroundColor: colors.accentSoft,
   },
   buttonContent: {
-    minHeight: 20,
+    minHeight: 22,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
   buttonText: {
-    color: colors.textOnPrimary,
-    fontSize: fontSizes.body,
-    lineHeight: 20,
+    ...typography.body,
     fontWeight: '600',
+    lineHeight: 22,
+    color: colors.textOnPrimary,
   },
   buttonTextSecondary: {
     color: colors.primary,
   },
   buttonTextDisabled: {
-    color: '#F3F4F6',
+    color: colors.textDisabled,
   },
   linkWrapper: {
-    paddingVertical: spacing.sm,
+    minHeight: touchTarget,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.sm,
   },
   linkPressed: {
     opacity: 0.6,
   },
   link: {
+    ...typography.body,
     color: colors.link,
-    fontSize: fontSizes.body,
     fontWeight: '600',
     textDecorationLine: 'underline',
   },

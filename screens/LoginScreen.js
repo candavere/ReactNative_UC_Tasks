@@ -9,20 +9,18 @@ import Screen from '../components/Screen';
 import ShowPasswordToggle from '../components/ShowPasswordToggle';
 import {
   getEmailError,
-  getPasswordError,
+  getLoginPasswordError,
   isEmailValid,
-  isPasswordValid,
+  isLoginPasswordPresent,
   normalizeEmail,
 } from '../validation';
 import { getLoginErrorMessage } from '../authErrors';
 import { auth } from '../firebaseConfig';
-import { colors, fontSizes, spacing } from '../theme';
-
-const SHORT_HEIGHT = 520;
+import { colors, shortHeight, spacing, typography } from '../theme';
 
 export default function LoginScreen({ navigation }) {
   const { height } = useWindowDimensions();
-  const isShort = height < SHORT_HEIGHT;
+  const isShort = height < shortHeight;
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -36,8 +34,8 @@ export default function LoginScreen({ navigation }) {
   const emailError =
     emailTouched || submitAttempted ? getEmailError(email) : '';
   const passwordError =
-    passwordTouched || submitAttempted ? getPasswordError(password) : '';
-  const formIsValid = isEmailValid(email) && isPasswordValid(password);
+    passwordTouched || submitAttempted ? getLoginPasswordError(password) : '';
+  const formIsValid = isEmailValid(email) && isLoginPasswordPresent(password);
 
   async function handleLogin() {
     setSubmitAttempted(true);
@@ -64,7 +62,7 @@ export default function LoginScreen({ navigation }) {
 
   return (
     <Screen testID="login-screen">
-      <Text style={[styles.title, isShort && styles.titleShort]}>
+      <Text style={[styles.title, isShort && styles.titleCompact]}>
         Welcome back
       </Text>
       <Text style={styles.subtitle}>Log in to your account</Text>
@@ -96,7 +94,7 @@ export default function LoginScreen({ navigation }) {
         }}
         onBlur={() => setPasswordTouched(true)}
         error={passwordError}
-        placeholder="At least 6 characters"
+        placeholder="Your password"
         secureTextEntry={!showPassword}
         autoCapitalize="none"
         autoCorrect={false}
@@ -135,16 +133,15 @@ export default function LoginScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   title: {
-    fontSize: fontSizes.title,
-    fontWeight: '700',
+    ...typography.title,
     color: colors.text,
     textAlign: 'center',
   },
-  titleShort: {
-    fontSize: fontSizes.titleCompact,
+  titleCompact: {
+    ...typography.titleCompact,
   },
   subtitle: {
-    fontSize: fontSizes.body,
+    ...typography.body,
     color: colors.textMuted,
     textAlign: 'center',
     marginTop: spacing.xs,
@@ -155,10 +152,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     flexWrap: 'wrap',
-    marginTop: spacing.md,
+    marginTop: spacing.sm,
   },
   footerText: {
-    fontSize: fontSizes.body,
+    ...typography.body,
     color: colors.textMuted,
   },
 });
