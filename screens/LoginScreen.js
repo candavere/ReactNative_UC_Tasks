@@ -14,7 +14,13 @@ import FormBanner from '../components/FormBanner';
 import FormField from '../components/FormField';
 import PrimaryButton, { TextLink } from '../components/PrimaryButton';
 import ShowPasswordToggle from '../components/ShowPasswordToggle';
-import { getEmailError, getPasswordError, normalizeEmail } from '../validation';
+import {
+  getEmailError,
+  getPasswordError,
+  isEmailValid,
+  isPasswordValid,
+  normalizeEmail,
+} from '../validation';
 import { getLoginErrorMessage } from '../authErrors';
 import { auth } from '../firebaseConfig';
 import { colors, fontSizes, spacing } from '../theme';
@@ -33,12 +39,18 @@ export default function LoginScreen({ navigation }) {
 
   // Derived on every render from the state above, so an error message can never
   // disagree with what is actually in the box.
+  //
+  // Validity is worked out straight from the field values with isEmailValid and
+  // isPasswordValid. It must NOT be derived from the error strings above: an
+  // untouched form deliberately shows no error messages, which would look
+  // identical to "everything is valid" and would leave the Login button
+  // enabled on an empty form.
   const emailError =
     emailTouched || submitAttempted ? getEmailError(email) : '';
   const passwordError =
     passwordTouched || submitAttempted ? getPasswordError(password) : '';
 
-  const formIsValid = emailError === '' && passwordError === '';
+  const formIsValid = isEmailValid(email) && isPasswordValid(password);
 
   async function handleLogin() {
     setSubmitAttempted(true);

@@ -14,7 +14,13 @@ import FormBanner from '../components/FormBanner';
 import FormField from '../components/FormField';
 import PrimaryButton, { TextLink } from '../components/PrimaryButton';
 import ShowPasswordToggle from '../components/ShowPasswordToggle';
-import { getEmailError, getPasswordError, normalizeEmail } from '../validation';
+import {
+  getEmailError,
+  getPasswordError,
+  isEmailValid,
+  isPasswordValid,
+  normalizeEmail,
+} from '../validation';
 import { getProfileSaveErrorMessage, getSignupErrorMessage } from '../authErrors';
 import { auth } from '../firebaseConfig';
 import { saveUserProfile } from '../userProfile';
@@ -42,7 +48,10 @@ export default function SignupScreen({ navigation }) {
   const passwordError =
     passwordTouched || submitAttempted ? getPasswordError(password) : '';
 
-  const formIsValid = emailError === '' && passwordError === '';
+  // Validity comes straight from the field values, NOT from the error strings.
+  // An untouched form shows no error messages at all, so treating "no message"
+  // as "valid" would enable the Signup button on an empty form.
+  const formIsValid = isEmailValid(email) && isPasswordValid(password);
 
   async function handleSubmit() {
     setSubmitAttempted(true);

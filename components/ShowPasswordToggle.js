@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text } from 'react-native';
+import { colors, fontSizes, spacing } from '../theme';
 
 /**
  * The "Show password" / "Hide password" toggle.
@@ -26,8 +27,8 @@ const styles = StyleSheet.create({
   toggle: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    color: '#1F4FD8',
-    fontSize: 14,
+    color: colors.primary,
+    fontSize: fontSizes.label,
     fontWeight: '600',
   },
 });

@@ -1,0 +1,420 @@
+# React Native Task 1 — Login and Signup with Firebase
+
+A small Expo app with three screens: **Login**, **Signup** and **Home**. It uses
+Firebase Authentication to check email and password, and Cloud Firestore to store
+a small, non-sensitive profile for each user.
+
+```
+Login  ──"Create an account"──►  Signup
+  ▲                                  │
+  │                                  │ (successful signup)
+  │                                  ▼
+  └────────── "Log in" link ──────  Home  ──"Logout"──►  Login
+```
+
+---
+
+## 1. The one design decision worth explaining
+
+The handout says:
+
+> *Signup screen — check if number/email already exists in Firestore.*
+> *Login Screen — Check Firestore for the user credentials.*
+
+This app does **not** store passwords in Firestore, and it does not query a list
+of users. Here is the reasoning in plain words.
+
+**Firestore is a document database, not a safe.** It has no concept of a secret.
+Anything written to it is, by default, readable by anyone who has the Firebase
+config — and the Firebase config is *supposed* to be public, because it ships
+inside every app that uses Firebase. If the password were in Firestore, then the
+password would effectively be public, and so would every other user's.
+
+**Firebase Authentication is the component built for this job.** It hashes the
+password on Google's own servers, stores only the hash, checks a login against
+that hash, and hands the app a signed-in session. The plain password never
+reaches Firestore and never comes back out of Firebase.
+
+So the same intent is met by splitting the two jobs:
+
+| The brief's wording | What this app actually does |
+| --- | --- |
+| "check if email already exists in Firestore" | `createUserWithEmailAndPassword` — Firebase checks for a duplicate email itself and rejects it with `auth/email-already-in-use` |
+| "check Firestore for the user credentials" | `signInWithEmailAndPassword` — Firebase checks the password against its stored hash |
+| "create new user" | Firebase creates the account; `users/{uid}` is then written with the email and signup date |
+
+**Why not query Firestore first, before signing up?** Two reasons:
+
+1. It does not work. A read-before-write is a *race* — two people could pass the
+   check at the same moment and both get an account. Firebase Auth enforces
+   uniqueness on its own servers, so there is no window to lose.
+2. It leaks information. A screen that says "that email is already registered" is
+   a way for anyone to find out whether a given person has an account here.
+   Letting Firebase answer privately is better.
+
+This is a **deliberate, researched departure from the literal wording of the
+brief.** It is documented here rather than hidden, and it is safe to explain in
+a viva: the brief's *goal* is "one account per email, and the right password gets
+you in", and that goal is met — just by the component that is actually designed
+for it, with the password handled properly.
+
+---
+
+## 2. What you need
+
+- Node.js 20 or newer (this was built on Node 26.7.0)
+- The Expo Go app on your phone, **or** a browser for the web preview
+- A free Firebase project
+
+---
+
+## 3. Firebase console setup
+
+These steps have to be done by hand in the browser. None of them can be done from
+the project files.
+
+### 3.1 Create the project
+
+1. Go to <https://console.firebase.google.com> and sign in.
+2. Click **Add project**, give it a name, and disable Google Analytics (not needed).
+3. Wait for the project to finish creating.
+
+### 3.2 Register a Web app and get the client config
+
+1. On the project overview page, click the **`</>` (Web)** icon to register a web
+   app. Give it a nickname and do **not** tick "also set up Firebase Hosting".
+2. Firebase shows a `firebaseConfig` object. Copy the six values:
+   `apiKey`, `authDomain`, `projectId`, `storageBucket`, `messagingSenderId`,
+   `appId`.
+3. Keep this tab open — you need it in the next step.
+
+### 3.3 Turn on Email/Password sign-in
+
+1. In the left sidebar click **Build → Authentication**.
+2. Click **Get started** if prompted.
+3. Open the **Sign-in method** tab.
+4. Click **Email/Password** in the provider list.
+5. Tick **Enable**, then click **Save**.
+
+### 3.4 Create the Firestore database
+
+1. In the left sidebar click **Build → Firestore Database**.
+2. Click **Create database**.
+3. Choose a **location** (pick the one nearest you; it cannot be changed later).
+4. **Important:** choose **Production mode**, *not* test mode. See section 6.
+5. Click **Create**.
+
+### 3.5 Publish the security rules
+
+1. Still on the Firestore Database page, open the **Rules** tab.
+2. Make sure **Production mode** is selected.
+3. Open `firestore.rules` from this project and paste the whole file into the
+   editor.
+4. Click **Publish**.
+
+Without this step the app will create accounts but will not be able to save any
+profiles, and you will see a `permission-denied` error.
+
+---
+
+## 4. Environment variables
+
+The Firebase config is not typed into the source. It is read from a `.env` file.
+
+```bash
+cp .env.example .env
+```
+
+Then open `.env` and fill in the six values from step 3.2:
+
+```
+EXPO_PUBLIC_FIREBASE_API_KEY=...
+EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=...
+EXPO_PUBLIC_FIREBASE_PROJECT_ID=...
+EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=...
+EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=...
+EXPO_PUBLIC_FIREBASE_APP_ID=...
+```
+
+`.env` is listed in `.gitignore` and is never committed. `.env.example` is
+committed and contains placeholders only.
+
+### Are these values secret? No — and that is fine
+
+Any variable whose name starts with `EXPO_PUBLIC_` is inlined into the
+JavaScript bundle by Expo. That means anybody who has the app can read these
+values. **This is expected and it is not a security problem**, because Firebase
+web config values are designed to be public — Firebase identifies your project
+by them, it does not authenticate you with them.
+
+What actually protects the data is:
+
+1. **Firebase Authentication**, which holds the password hashes, and
+2. **the Firestore security rules** in `firestore.rules`, which decide who may
+   read and write which document.
+
+A real secret would be a service account key, an admin SDK credential, or an API
+server key with admin privileges. **None of those belong in this project**, and
+none are present in it. If you ever find yourself pasting a `private_key` field
+into a mobile app, stop — that is a serious mistake.
+
+### If `.env` is missing
+
+The app does not crash and does not pretend to work. `firebaseConfig.js` exports
+`isFirebaseConfigured`, and `App.js` shows a "Firebase is not set up yet" screen
+explaining exactly which file to create. Without this, the only symptom would be
+a confusing network error the first time you pressed a button.
+
+---
+
+## 5. Running it
+
+```bash
+npm install          # first time only
+npx expo start       # then press "i" for iOS, "a" for Android, or scan the QR code
+```
+
+Other options:
+
+```bash
+npx expo start --web     # browser preview
+npx expo start -c        # clear the bundler cache (do this after editing .env)
+```
+
+To use a physical phone, install **Expo Go**, make sure the phone and the
+computer are on the same Wi-Fi, and scan the QR code shown by `npx expo start`.
+
+> Changing anything in `.env` requires restarting with `npx expo start -c`.
+> Expo reads the file when the bundle is built, and the cache will otherwise
+> keep the old values.
+
+---
+
+## 6. Firestore security rules
+
+The rules live in `firestore.rules` and are deployed by hand (section 3.5).
+
+**Test mode must not be left on.** When you create a Firestore database, Firebase
+offers test mode, which allows anyone to read and write the whole database for 30
+days, and then locks it. If a deadline is missed, the database silently becomes
+read-only, or — if it was never secured — remains wide open. The rules in this
+project close every path except a user's own profile document.
+
+What the rules allow:
+
+| Action | Allowed? |
+| --- | --- |
+| Signed-in user reads `users/{their own uid}` | yes |
+| Signed-in user creates `users/{their own uid}` with only `email` + `createdAt` | yes |
+| Signed-in user writes to `users/{someone else's uid}` | **no** |
+| Signed-in user writes to any other collection | **no** |
+| Signed-out user reads or writes anything | **no** |
+| Any user deletes a document | **no** |
+
+The `hasOnly([...])` check is worth calling out: without it, a user could add
+extra fields to their own document. Firestore rules are not a schema, so what is
+*not* explicitly allowed has to be explicitly forbidden.
+
+---
+
+## 7. File map
+
+Every file in the project, and what it is for.
+
+| Path | Purpose |
+| --- | --- |
+| `index.js` | Entry point named in `package.json`. Registers `App` as the root component. |
+| `App.js` | The navigator. Holds the auth-state listener that decides whether to start on Login or Home, and resets the stack to Login on sign-out. |
+| `app.json` | Expo app configuration (name, slug, bundle identifiers). |
+| `firebaseConfig.js` | Reads the six `EXPO_PUBLIC_FIREBASE_*` values from the environment and exports `auth`, `db` and `isFirebaseConfigured`. |
+| `theme.js` | Shared colours, spacing and font sizes, so the three screens stay consistent. |
+| `validation.js` | The email and password rules, and the messages shown for them. |
+| `authErrors.js` | Turns Firebase error codes (`auth/email-already-in-use`, …) into readable sentences. |
+| `userProfile.js` | The only file that talks to Firestore. Saves and reads `users/{uid}`. |
+| `firestore.rules` | Firestore security rules. Deployed by hand through the console. |
+| `.env.example` | The template for `.env`, with placeholders. Committed. |
+| `.env` | Your real Firebase config. Git-ignored. |
+| `.gitignore` | Keeps `.env`, `node_modules` and other local files out of git. |
+| `TESTING.md` | The full record of what was tested, what failed, and what was not verified. |
+| `scripts/test-validation.mjs` | Automated tests for `validation.js`. Run with `npm test`. |
+| `scripts/verify-firebase-rules.mjs` | Live checks of Auth behaviour and the Firestore rules. Run with `npm run verify:firebase`. Creates real test accounts. |
+| `scripts/check-theme-imports.mjs` | Static check for theme values used without being imported. |
+| `screens/LoginScreen.js` | The login form. |
+| `screens/SignupScreen.js` | The signup form, including the retry path for a failed profile write. |
+| `screens/HomeScreen.js` | Shows the signed-in email and signup date, plus Logout. |
+| `components/FormField.js` | A labelled input with an error message underneath. |
+| `components/FormBanner.js` | The red banner for whole-form errors from the backend. |
+| `components/PrimaryButton.js` | The main button, plus the `TextLink` used for "Sign up" / "Log in". |
+| `components/ShowPasswordToggle.js` | The Show / Hide control for the password field. |
+| `components/LoadingView.js` | Centred message with a spinner, used while the session is checked. |
+
+### Why so many small files?
+
+- `validation.js` and `authErrors.js` exist so Login and Signup cannot disagree
+  about what counts as a valid email or how an error is worded. The rule is
+  written once.
+- `components/FormField.js` exists because both screens need an input with a
+  label and an error underneath. Writing it twice would guarantee the two drift
+  apart.
+- `userProfile.js` exists so that the Firestore document path `users/{uid}` is
+  written in exactly one place. If the path or the field names ever change,
+  there is a single place to change — and a single place that could accidentally
+  start storing something sensitive.
+- `scripts/` holds three check scripts, each runnable on its own. They were added
+  because two real bugs got through bundling and were only caught by running the
+  app and by testing against Firebase directly.
+
+There is no global state library, no UI framework, and no validation library. The
+state in this app is four `useState` hooks per screen, which is easy to follow.
+
+---
+
+## 8. Screen flow
+
+### Login
+
+1. Email and password fields with live validation.
+2. Errors appear **only after** you have interacted with a field or pressed
+   Login — an untouched empty form stays quiet.
+3. The **Login** button is genuinely `disabled` while the form is invalid, so a
+   stray double tap cannot fire a request.
+4. **Show / Hide** toggles `secureTextEntry`.
+5. While the request is in flight the button shows a spinner.
+6. On success: `navigation.reset` to Home. On failure: a banner above the button
+   explaining what went wrong.
+
+### Signup
+
+The same form, plus one extra case. Signup is two operations:
+
+1. `createUserWithEmailAndPassword` — creates the account and signs you in.
+2. `saveUserProfile` — writes `users/{uid}` to Firestore.
+
+If step 1 succeeds but step 2 fails, the account **does** exist and you **are**
+signed in. Presenting that as a failed signup would be a lie, and pressing
+"Signup" again would just fail with "email already in use" and lock the user out.
+
+So the screen detects this case and swaps to a different view: *"Your account was
+created, but your profile could not be saved."* with a **Retry saving profile**
+button that retries **only** the Firestore write, using whoever is signed in. It
+never calls the signup function a second time, so a second account cannot be
+created.
+
+### Home
+
+Shows the signed-in email, the signup date read from `users/{uid}`, and a
+**Logout** button.
+
+### Not being able to get back into Home
+
+Three things stop a signed-out user from reaching Home with the Back button:
+
+1. `navigation.reset` after a successful login clears the whole stack, so there
+   is nothing behind Home to go back to.
+2. The Home screen sets `gestureEnabled: false`, so the swipe-back gesture does
+   nothing.
+3. An `onAuthStateChanged` listener in `App.js` resets the stack to Login
+   whenever the Firebase session ends — whether that was the Logout button or
+   Firebase revoking the session itself.
+
+---
+
+## 9. Validation rules
+
+**Email** — trimmed, then checked against
+`/^[^\s@]+@[^\s@]+\.[^\s@]+$/`. This is a practical check, not a full RFC 5322
+email parser; writing a correct one is genuinely hard and Firebase validates the
+address server-side anyway.
+
+The email is also **lower-cased** before being sent, so ` Test@Example.com ` and
+`test@example.com` are the same account and a user is not told their own address
+is taken because of a stray capital letter.
+
+**Password** — at least 6 characters, which is Firebase's own minimum.
+
+The password is **never trimmed and never changed**. Every character the user
+typed is part of the password, including a leading space or a capital letter.
+The character count is measured on the raw value, and the raw value is what gets
+sent to Firebase.
+
+**Validity is derived, not stored.** The error strings are recalculated from the
+field values on every render:
+
+```js
+const emailError = emailTouched || submitAttempted ? getEmailError(email) : '';
+const formIsValid = emailError === '' && passwordError === '';
+```
+
+There is no `isValid` state that could fall out of sync with the inputs.
+
+---
+
+## 10. What was tested, and what was not
+
+Full record in **[`TESTING.md`](./TESTING.md)**, including the exact commands, the
+results, the two bugs that testing found, and an explicit list of what was *not*
+verified.
+
+Short version:
+
+| Area | Result |
+| --- | --- |
+| Validation rules | 25/25 automated assertions pass (`npm test`) |
+| Expo project health | 21/21 `expo-doctor` checks pass |
+| Firebase Auth + Firestore rules, live | 13/13 pass (`npm run verify:firebase`) |
+| Login / Signup / Home, driven in the browser | 21 checks, 20 pass, 1 partial |
+| Bugs found and fixed during testing | 2 (see `TESTING.md` section 3) |
+
+**Not verified, and worth checking on a real phone:**
+
+- The native **hardware back button** from Home.
+- **Narrow / phone-width layout** — the automated browser could not be resized
+  to a phone viewport, so only desktop width was inspected.
+- **On-screen keyboard** behaviour, which web does not have.
+- The **loading spinner** animation.
+- The **partial-signup retry path** (Auth succeeds, Firestore write fails),
+  because triggering it would mean deliberately breaking the security rules.
+
+---
+
+## 11. Running the tests yourself
+
+```bash
+npm test              # validation rules, no network, instant
+npm run verify:firebase   # live Firebase: Auth + security rules
+node scripts/check-theme-imports.mjs   # static check
+npx expo-doctor        # project health
+```
+
+> `npm run verify:firebase` **creates a real test account in your Firebase
+> project** each time it runs. Delete them afterwards from
+> Authentication → Users. The list of accounts created during this build is in
+> `TESTING.md` section 5.
+
+---
+
+## 12. Known limitations
+
+Stated plainly, so none of these come as a surprise in a viva.
+
+- **The session does not survive closing the app.** Firebase Auth is used without
+  a persistence layer, so it keeps the session in memory only. Closing Expo Go
+  logs you out. Adding persistence needs `@react-native-async-storage/async-storage`,
+  which was left out deliberately as it is not required by the brief.
+- **No email verification.** An account can be created with any address that
+  passes the format check, including one that does not exist. Real verification
+  is beyond the brief.
+- **No password reset.** Also beyond the brief.
+- **No rate limiting or abuse protection beyond Firebase's own.** Firebase does
+  throttle repeated failed attempts; there is nothing extra here.
+- **This is coursework, not production account handling.** It is not a
+  production-grade authentication system and should not be described as one.
+- **The brief mentions a "number" field** ("check if number/email already
+  exists"). No phone number field is specified anywhere else in the brief, and
+  no screen is described as collecting one, so the app implements email and
+  password only. A phone field would need Firebase Phone Auth, which is a
+  different provider.
+- **A user can rewrite their own `email` and `createdAt` values** in Firestore.
+  The rules block every other field and every other document, but they do not
+  make a user's own profile immutable. That is acceptable here because the
+  document holds nothing sensitive.

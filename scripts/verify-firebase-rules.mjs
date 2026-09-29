@@ -48,6 +48,9 @@ await setPersistence(auth, inMemoryPersistence);
 
 // A fresh email each run, so re-running the check does not hit the
 // "already in use" path at test 1.
+//
+// The password below is a throwaway constant for these disposable test
+// accounts. It is NOT a real credential and it protects nothing.
 const EMAIL = `task1-test-${Date.now().toString(36)}@example.com`;
 const PASS = 'TestPass123!';
 
@@ -121,7 +124,7 @@ check('correct password logs in', auth.currentUser?.uid === uid);
 console.log('\n=== TEST 9: login with the WRONG password ===');
 await signOut(auth);
 try {
-  await signInWithEmailAndPassword(auth, EMAIL, 'WrongPassword1');
+  await signInWithEmailAndPassword(auth, EMAIL, 'DefinitelyTheWrongOne1');
   check('wrong password rejected', false, 'it unexpectedly succeeded');
 } catch (e) {
   check('wrong password rejected', true, e.code);
