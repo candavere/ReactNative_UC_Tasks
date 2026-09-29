@@ -1,15 +1,16 @@
 import React from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, fontSizes, spacing } from '../theme';
 
-export default function HomeScreen({ route }) {
+export default function HomeScreen() {
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <View style={styles.container}>
         <Text style={styles.title}>Home</Text>
         <Text style={styles.body}>
-          You are signed in. This screen is shown after a successful login or signup.
+          You are signed in. Stage 4 replaces this with the real account details
+          and a Logout button.
         </Text>
       </View>
     </SafeAreaView>

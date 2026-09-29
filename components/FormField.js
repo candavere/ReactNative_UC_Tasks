@@ -16,6 +16,9 @@ export default function FormField({
   error,
   onBlur,
   editable = true,
+  // An optional element rendered at the right-hand end of the input box. The
+  // password field uses it for the Show / Hide button.
+  rightAdornment,
   // Extra props are forwarded straight to the TextInput. This is how the
   // password field passes secureTextEntry / keyboardType etc.
   ...textInputProps
@@ -24,22 +27,23 @@ export default function FormField({
 
   return (
     <View style={styles.wrapper}>
-      <Text style={styles.label} nativeID={`${label}-label`}>
-        {label}
-      </Text>
+      <Text style={styles.label}>{label}</Text>
 
-      <TextInput
-        style={[styles.input, hasError && styles.inputError]}
-        value={value}
-        onChangeText={onChangeText}
-        onBlur={onBlur}
-        editable={editable}
-        placeholderTextColor={colors.textMuted}
-        // Ties the error text to the input for screen readers.
-        accessibilityLabel={label}
-        accessibilityHint={hasError ? error : undefined}
-        {...textInputProps}
-      />
+      <View style={styles.inputRow}>
+        <TextInput
+          style={[styles.input, hasError && styles.inputError, styles.inputFlex]}
+          value={value}
+          onChangeText={onChangeText}
+          onBlur={onBlur}
+          editable={editable}
+          placeholderTextColor={colors.textMuted}
+          // Ties the error text to the input for screen readers.
+          accessibilityLabel={label}
+          accessibilityHint={hasError ? error : undefined}
+          {...textInputProps}
+        />
+        {rightAdornment}
+      </View>
 
       {/* Reserve the space even when there is no error, so the layout does not
           jump up and down as errors appear and disappear. */}
@@ -64,20 +68,31 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: spacing.xs,
   },
-  input: {
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    // The row owns the border, so the input and the Show/Hide button line up
+    // inside a single box.
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 10,
+    backgroundColor: colors.card,
+  },
+  inputFlex: {
+    flex: 1,
+  },
+  input: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     fontSize: fontSizes.body,
     color: colors.text,
-    backgroundColor: colors.card,
     minHeight: 52,
   },
   inputError: {
-    borderColor: colors.error,
     backgroundColor: colors.errorBackground,
+  },
+  rowError: {
+    borderColor: colors.error,
   },
   errorSlot: {
     minHeight: 20, // one line of error text
