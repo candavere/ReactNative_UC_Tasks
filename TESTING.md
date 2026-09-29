@@ -111,6 +111,7 @@ back from the rendered page.
 | 20 | Session survives a page reload | PASS | reloaded, still signed in, went straight to Home |
 | 21 | Back cannot reach Home | **PARTIAL** | see note below |
 | 22–28 | Loading indicator (spinner) — 7 checks | PASS | see the "Loading indicator" section below |
+| 29–39 | Orientation and resizing — 11 checks | PASS | see the "Orientation and resizing" section below |
 
 ### Note on test 21 (back button)
 
@@ -160,14 +161,63 @@ Two notes recorded honestly:
   `saveUserProfile`, so the spinner covers the whole two-step signup. The gap
   was only that `PrimaryButton` never drew anything.
 
+### Orientation and resizing (re-tested 29 September 2026)
+
+`app.json` was changed to `"orientation": "default"`, `ios.requireFullScreen` was
+set to `false`, `android.softwareKeyboardLayoutMode` was set to `resize`, and all
+three screens were moved into a shared responsive `components/Screen.js`.
+
+The headless browser used here cannot be resized directly, so the app was loaded
+in a same-origin iframe sized to exact CSS pixels. That gives a true viewport for
+`useWindowDimensions()`, and it also allows the app's DOM to be inspected. That
+harness was temporary and has been deleted; it is not part of the project.
+
+Values were entered by dispatching real `input` events on the DOM inputs, which
+is what React's `onChange` listens to. That exercises the app's state handling,
+but it is not the same as physical keystrokes, so real typing remains a device
+check.
+
+| # | Check | Result | Evidence |
+| --- | --- | --- | --- |
+| 29 | No horizontal overflow at any size | PASS | `documentElement.scrollWidth` never exceeded the viewport width, and no element crossed the right edge, on Login, Signup and Home at all three sizes |
+| 30 | Login 390×844 portrait | PASS | form centred, no clipping |
+| 31 | Login 844×390 landscape | PASS | content column capped at 520px and centred; scrollable; Login button reachable after scrolling |
+| 32 | Login 320×640 narrow | PASS | fits without scrolling, no clipping |
+| 33 | Signup at all three sizes | PASS | same results as Login |
+| 34 | Home at 390×844 and 844×390 | PASS | card centred, Logout reachable after scrolling |
+| 35 | Typed email and password survive resizing | PASS | values identical before and after 844×390 → 320×640 → 390×844 → 844×390 |
+| 36 | Show/hide password toggle survives resizing | PASS | input stayed `type="text"` and the label stayed "Hide" across three resizes |
+| 37 | Touched / error state survives resizing | PASS | an invalid email kept its error message through resizes |
+| 38 | Signed-in session survives resizing | PASS | Home still showed the email and "Member since" after six resizes |
+| 39 | No console errors or warnings during rotation | PASS | `console.error` and `console.warn` were hooked on the app's window; **0 messages** across 15 resizes on all three screens |
+
+#### A real bug this testing found
+
+The first version of the responsive layout did not scroll at all in landscape.
+The React Navigation stack card is sized to its content (`flex: 0 0 auto`), so the
+whole `flex: 1` chain below it grew to fit the form: in a 390px-tall landscape
+window the `ScrollView` measured 412px of content inside a 412px viewport, which
+meant `scrollHeight === clientHeight`, nothing could scroll, and the bottom of
+the Login button sat permanently out of reach below the fold.
+
+Fixed by giving the card `flex: 1, minHeight: 0` in the navigator's `cardStyle`,
+which bounds it to the viewport. After the fix the same landscape measurement is
+326px of viewport against 412px of content — 86px of scroll, and the button is
+reachable.
+
+#### Measured while fixing that
+
+To be sure the spinner work had not regressed, the button height was sampled
+continuously across the loading transition. It remained exactly 52px, as before.
+
 ### Not tested
 
-- **Narrow / phone-width layout.** The headless browser used here could not be
-  resized to a phone viewport, so the layouts were only inspected at desktop
-  width (1280×720). The layouts use no fixed widths and the forms are in a
-  `ScrollView`, but this needs a real check on a phone.
-- **On-screen keyboard behaviour** (`KeyboardAvoidingView`) — web has no
-  software keyboard.
+- **On-screen keyboard behaviour.** The web preview has no software keyboard, so
+  `KeyboardAvoidingView` could not be exercised. This is the main thing to check
+  on a real phone.
+- **Physical device rotation.** Resizing an iframe exercises the same React and
+  layout code, but a real rotation on iOS and Android also goes through the
+  platform's own configuration-change handling.
 - **The partial-signup retry path** (Auth succeeds, Firestore write fails) was
   not triggered, because forcing a Firestore write to fail would mean breaking
   the security rules. The code path exists and is described in the README, but it
@@ -213,6 +263,14 @@ const formIsValid = isEmailValid(email) && isPasswordValid(password);
 ```
 
 Confirmed fixed by test 3 and test 8 above.
+
+### Bug 3 — the form could not scroll in landscape
+
+The React Navigation stack card is sized to its content, so the responsive layout
+grew past the viewport and the ScrollView never became scrollable. The bottom of
+the Login button was permanently out of reach on a landscape phone. Fixed by
+bounding the card with `flex: 1, minHeight: 0`. Full detail and measurements are
+in the "Orientation and resizing" section above.
 
 ---
 

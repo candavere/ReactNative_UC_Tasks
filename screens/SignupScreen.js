@@ -1,18 +1,11 @@
 import React, { useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 
 import FormBanner from '../components/FormBanner';
 import FormField from '../components/FormField';
 import PrimaryButton, { TextLink } from '../components/PrimaryButton';
+import Screen from '../components/Screen';
 import ShowPasswordToggle from '../components/ShowPasswordToggle';
 import {
   getEmailError,
@@ -21,46 +14,40 @@ import {
   isPasswordValid,
   normalizeEmail,
 } from '../validation';
-import { getProfileSaveErrorMessage, getSignupErrorMessage } from '../authErrors';
+import {
+  getProfileSaveErrorMessage,
+  getSignupErrorMessage,
+} from '../authErrors';
 import { auth } from '../firebaseConfig';
 import { saveUserProfile } from '../userProfile';
 import { colors, fontSizes, spacing } from '../theme';
 
+const SHORT_HEIGHT = 520;
+
 export default function SignupScreen({ navigation }) {
+  const { height } = useWindowDimensions();
+  const isShort = height < SHORT_HEIGHT;
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-
   const [emailTouched, setEmailTouched] = useState(false);
   const [passwordTouched, setPasswordTouched] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
-
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState('');
-
-  // Set when the Auth account was created but saving the Firestore profile
-  // failed. In that situation the user is already signed in, so the button
-  // changes meaning from "Signup" to "Retry saving profile" - see handleSubmit.
   const [profileSaveFailed, setProfileSaveFailed] = useState(false);
 
   const emailError =
     emailTouched || submitAttempted ? getEmailError(email) : '';
   const passwordError =
     passwordTouched || submitAttempted ? getPasswordError(password) : '';
-
-  // Validity comes straight from the field values, NOT from the error strings.
-  // An untouched form shows no error messages at all, so treating "no message"
-  // as "valid" would enable the Signup button on an empty form.
   const formIsValid = isEmailValid(email) && isPasswordValid(password);
 
   async function handleSubmit() {
     setSubmitAttempted(true);
 
     if (profileSaveFailed) {
-      // The Auth account already exists. Do NOT call
-      // createUserWithEmailAndPassword again - that would just fail with
-      // "email already in use", and the user could never get past this screen.
-      // Only retry the Firestore write, using whoever is signed in right now.
       await retryProfileSave();
       return;
     }
@@ -69,37 +56,21 @@ export default function SignupScreen({ navigation }) {
     setLoading(true);
 
     try {
-      // Trimming and lower-casing means " Test@Example.com " and
-      // "test@example.com" are treated as the same account.
       const trimmedEmail = normalizeEmail(email);
 
-      // This single call does the whole "check if email already exists"
-      // job. Firebase hashes the password on its own servers, checks whether
-      // the email is taken, stores the account, and signs the user in. It
-      // rejects a duplicate email with auth/email-already-in-use.
-      //
-      // Note what is NOT happening: no query of a public list of users, and
-      // no password being stored anywhere we control.
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         trimmedEmail,
         password,
       );
 
-      // The account now exists and we are signed in. Now save the small
-      // non-sensitive profile document.
       await saveUserProfile(userCredential.user.uid, trimmedEmail);
 
-      // Only now do we go to Home. Nothing is shown as successful until both
-      // halves of the signup have worked.
       navigation.reset({
         index: 0,
         routes: [{ name: 'Home' }],
       });
     } catch (error) {
-      // Which half failed? If the Auth call threw, no account was created and
-      // the user can safely press Signup again. If we got past it, the account
-      // already exists.
       if (auth.currentUser && !isAuthError(error)) {
         setProfileSaveFailed(true);
         setFormError(
@@ -109,7 +80,6 @@ export default function SignupScreen({ navigation }) {
         setFormError(getSignupErrorMessage(error));
       }
     } finally {
-      // Always clears the spinner, whether the signup worked or not.
       setLoading(false);
     }
   }
@@ -141,154 +111,118 @@ export default function SignupScreen({ navigation }) {
   }
 
   if (profileSaveFailed) {
-    // The account exists but the profile is missing. The form is kept on screen
-    // rather than replaced, so the user can see what they typed, and the main
-    // button becomes a Retry button. The inputs are locked because the account
-    // has already been created with this email - changing it now would not do
-    // anything useful.
     return (
-      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-        <KeyboardAvoidingView
-          style={styles.flex}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-          <ScrollView contentContainerStyle={styles.scroll}>
-            <Text style={styles.title}>Almost done</Text>
-            <Text style={styles.subtitle}>
-              Your account was created, but your profile could not be saved to
-              Firestore.
-            </Text>
+      <Screen testID="signup-retry-screen">
+        <Text style={[styles.title, isShort && styles.titleShort]}>
+          Almost done
+        </Text>
+        <Text style={styles.subtitle}>
+          Your account was created, but your profile could not be saved to
+          Firestore.
+        </Text>
 
-            <FormBanner message={formError} />
+        <FormBanner message={formError} />
 
-            <PrimaryButton
-              title="Retry saving profile"
-              onPress={handleSubmit}
-              loading={loading}
-              testID="signup-retry"
-            />
+        <PrimaryButton
+          title="Retry saving profile"
+          onPress={handleSubmit}
+          loading={loading}
+          testID="signup-retry"
+        />
 
-            <Text style={styles.retryNote}>
-              Retrying only saves your profile. It does not create a second
-              account.
-            </Text>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
+        <Text style={styles.retryNote}>
+          Retrying only saves your profile. It does not create a second account.
+        </Text>
+      </Screen>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-        >
-          <Text style={styles.title}>Create an account</Text>
-          <Text style={styles.subtitle}>
-            Sign up with your email and password
-          </Text>
+    <Screen testID="signup-screen">
+      <Text style={[styles.title, isShort && styles.titleShort]}>
+        Create an account
+      </Text>
+      <Text style={styles.subtitle}>
+        Sign up with your email and password
+      </Text>
 
-          <FormField
-            label="Email"
-            value={email}
-            onChangeText={(text) => {
-              setEmail(text);
-              setEmailTouched(true);
-            }}
-            onBlur={() => setEmailTouched(true)}
-            error={emailError}
-            placeholder="example@domain.com"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete="email"
-            textContentType="emailAddress"
-            returnKeyType="next"
+      <FormField
+        label="Email"
+        value={email}
+        onChangeText={(text) => {
+          setEmail(text);
+          setEmailTouched(true);
+        }}
+        onBlur={() => setEmailTouched(true)}
+        error={emailError}
+        placeholder="example@domain.com"
+        keyboardType="email-address"
+        autoCapitalize="none"
+        autoCorrect={false}
+        autoComplete="email"
+        textContentType="emailAddress"
+        returnKeyType="next"
+      />
+
+      <FormField
+        label="Password"
+        value={password}
+        onChangeText={(text) => {
+          setPassword(text);
+          setPasswordTouched(true);
+        }}
+        onBlur={() => setPasswordTouched(true)}
+        error={passwordError}
+        placeholder="At least 6 characters"
+        secureTextEntry={!showPassword}
+        autoCapitalize="none"
+        autoCorrect={false}
+        autoComplete="new-password"
+        textContentType="newPassword"
+        returnKeyType="go"
+        onSubmitEditing={formIsValid ? handleSubmit : undefined}
+        rightAdornment={
+          <ShowPasswordToggle
+            visible={showPassword}
+            onPress={() => setShowPassword((current) => !current)}
           />
+        }
+      />
 
-          <FormField
-            label="Password"
-            value={password}
-            onChangeText={(text) => {
-              setPassword(text);
-              setPasswordTouched(true);
-            }}
-            onBlur={() => setPasswordTouched(true)}
-            error={passwordError}
-            placeholder="At least 6 characters"
-            secureTextEntry={!showPassword}
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete="new-password"
-            textContentType="newPassword"
-            returnKeyType="go"
-            onSubmitEditing={formIsValid ? handleSubmit : undefined}
-            rightAdornment={
-              <ShowPasswordToggle
-                visible={showPassword}
-                onPress={() => setShowPassword((current) => !current)}
-              />
-            }
-          />
+      <FormBanner message={formError} />
 
-          <FormBanner message={formError} />
+      <PrimaryButton
+        title="Signup"
+        onPress={handleSubmit}
+        disabled={!formIsValid}
+        loading={loading}
+        testID="signup-submit"
+      />
 
-          <PrimaryButton
-            title="Signup"
-            onPress={handleSubmit}
-            disabled={!formIsValid}
-            loading={loading}
-            testID="signup-submit"
-          />
-
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Already have an account? </Text>
-            <TextLink
-              title="Log in"
-              onPress={() => navigation.navigate('Login')}
-            />
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>Already have an account? </Text>
+        <TextLink
+          title="Log in"
+          onPress={() => navigation.navigate('Login')}
+        />
+      </View>
+    </Screen>
   );
 }
 
-/**
- * True if the error came from the Firebase Auth call rather than from Firestore.
- *
- * Auth errors all have a code starting with "auth/", so that is what we test
- * for. This is how the catch block above tells "signup did not happen" apart
- * from "signup happened but the profile did not save".
- */
 function isAuthError(error) {
   return typeof error?.code === 'string' && error.code.startsWith('auth/');
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  flex: {
-    flex: 1,
-  },
-  scroll: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: spacing.lg,
-  },
   title: {
     fontSize: fontSizes.title,
     fontWeight: '700',
     color: colors.text,
     textAlign: 'center',
+  },
+  titleShort: {
+    fontSize: fontSizes.titleCompact,
   },
   subtitle: {
     fontSize: fontSizes.body,
@@ -301,6 +235,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    flexWrap: 'wrap',
     marginTop: spacing.md,
   },
   footerText: {

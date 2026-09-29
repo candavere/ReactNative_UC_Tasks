@@ -225,7 +225,7 @@ Every file in the project, and what it is for.
 | --- | --- |
 | `index.js` | Entry point named in `package.json`. Registers `App` as the root component. |
 | `App.js` | The navigator. Holds the auth-state listener that decides whether to start on Login or Home, and resets the stack to Login on sign-out. |
-| `app.json` | Expo app configuration (name, slug, bundle identifiers). |
+| `app.json` | Expo app configuration. `orientation` is `default` so both portrait and landscape are allowed, `ios.requireFullScreen` is `false` so iPad Split View does not lock rotation, and `android.softwareKeyboardLayoutMode` is `resize`. |
 | `firebaseConfig.js` | Reads the six `EXPO_PUBLIC_FIREBASE_*` values from the environment and exports `auth`, `db` and `isFirebaseConfigured`. |
 | `theme.js` | Shared colours, spacing and font sizes, so the three screens stay consistent. |
 | `validation.js` | The email and password rules, and the messages shown for them. |
@@ -247,6 +247,7 @@ Every file in the project, and what it is for.
 | `components/PrimaryButton.js` | The main button, plus the `TextLink` used for "Sign up" / "Log in". Swaps its label for a spinner while `loading` is true. |
 | `components/ShowPasswordToggle.js` | The Show / Hide control for the password field. |
 | `components/LoadingView.js` | Centred plain-text message shown while Firebase reports whether a session already exists. It deliberately contains no spinner — the spinners live in `PrimaryButton`, where a request is actually in flight. |
+| `components/Screen.js` | The responsive shell every screen uses: safe area, keyboard avoidance, and a scrolling, width-capped content column. |
 
 ### Why so many small files?
 
@@ -321,7 +322,71 @@ Three things stop a signed-out user from reaching Home with the Back button:
 
 ---
 
-## 9. The two brownie-task features
+## 9. Orientation and resizing
+
+The app works in portrait, in landscape, and at narrow widths, and nothing is
+lost when the window changes size.
+
+### Allowing rotation
+
+`app.json` sets `"orientation": "default"`, which is what lets the app use both
+portrait and landscape. Two related settings matter as well:
+
+- `ios.requireFullScreen: false`. If this were `true`, iOS would run the app
+  full screen and lock the orientation on iPad, so Split View and Slide Over
+  rotation would be blocked.
+- `android.softwareKeyboardLayoutMode: "resize"`. On Android the keyboard
+  shrinks the window itself. The `KeyboardAvoidingView` therefore only adds
+  padding on iOS (`behavior={Platform.OS === 'ios' ? 'padding' : undefined}`).
+  Giving Android a `behavior` as well would apply the offset twice and push the
+  form too far up.
+
+### How the layout responds
+
+All three screens render inside `components/Screen.js`, which does four things:
+
+1. **`useWindowDimensions()`** for the current size, rather than
+   `Dimensions.get('window')` at module load. A module-level read is taken once
+   when the file is first evaluated and is never updated, so a rotation would
+   leave the app sizing itself against stale numbers.
+2. **A scrolling column capped at 520px wide**, centred by
+   `alignItems: 'center'`. On a phone in portrait the form uses the full width;
+   in landscape, or on a tablet, the extra width becomes margin instead of
+   absurdly long input boxes.
+3. **A `ScrollView` with `keyboardShouldPersistTaps="handled"`**, so the form
+   can be scrolled even while the keyboard is open, and the first tap on a
+   button still registers instead of only dismissing the keyboard.
+4. **`flexGrow` on the content rather than `justifyContent: 'center'` on the
+   scroll container.** Centring the scroll container is a well-known trap: when
+   the content is taller than the viewport, the overflow is cut off the *top* and
+   cannot be scrolled to. `flexGrow` lets short content centre itself while tall
+   content simply grows and scrolls normally.
+
+When the window is shorter than 520px — which is what landscape on a phone
+usually is — the vertical padding shrinks and the screen title steps down from
+`title` to `titleCompact` so that less vertical space is wasted.
+
+### Why state survives a rotation
+
+Rotation is only a layout change. Nothing in the tree is keyed by orientation
+and no branch of any render depends on it, so React does not unmount and
+remount the screen components — which is what would throw the form away. The
+typed email and password, the touched flags, the error messages, the show/hide
+toggle, the loading spinner and the Firebase session are all ordinary component
+state or module state, so they all persist.
+
+This was verified by filling in the forms, toggling the password, and then
+resizing repeatedly: the values and the toggle state were still there
+afterwards. See `TESTING.md`.
+
+One honest caveat: on **Android**, if the operating system kills and recreates
+the app to reclaim memory, the React tree is rebuilt and in-memory state is
+gone. That is platform behaviour, not something this code can prevent, and it is
+the same reason the Firebase session does not survive closing Expo Go.
+
+---
+
+## 10. The two brownie-task features
 
 The brief lists two extra features. Here is exactly where each one lives.
 
@@ -354,7 +419,7 @@ stuck on if the request throws.
 
 ---
 
-## 10. Validation rules
+## 11. Validation rules
 
 **Email** — trimmed, then checked against
 `/^[^\s@]+@[^\s@]+\.[^\s@]+$/`. This is a practical check, not a full RFC 5322
@@ -384,7 +449,7 @@ There is no `isValid` state that could fall out of sync with the inputs.
 
 ---
 
-## 11. What was tested, and what was not
+## 12. What was tested, and what was not
 
 Full record in **[`TESTING.md`](./TESTING.md)**, including the exact commands, the
 results, the two bugs that testing found, and an explicit list of what was *not*
@@ -397,21 +462,20 @@ Short version:
 | Validation rules | 25/25 automated assertions pass (`npm test`) |
 | Expo project health | 21/21 `expo-doctor` checks pass |
 | Firebase Auth + Firestore rules, live | 13/13 pass (`npm run verify:firebase`) |
-| Login / Signup / Home, driven in the browser | 28 checks, 27 pass, 1 partial |
-| Bugs found and fixed during testing | 2 (see `TESTING.md` section 3) |
+| Login / Signup / Home, driven in the browser | 39 checks, 38 pass, 1 partial |
+| Bugs found and fixed during testing | 3 (see `TESTING.md` section 3) |
 
 **Not verified, and worth checking on a real phone:**
 
 - The native **hardware back button** from Home.
-- **Narrow / phone-width layout** — the automated browser could not be resized
-  to a phone viewport, so only desktop width was inspected.
-- **On-screen keyboard** behaviour, which web does not have.
+- **On-screen keyboard** behaviour, which the web preview does not have — see
+  the orientation notes in `TESTING.md` for exactly what to try.
 - The **partial-signup retry path** (Auth succeeds, Firestore write fails),
   because triggering it would mean deliberately breaking the security rules.
 
 ---
 
-## 12. Running the tests yourself
+## 13. Running the tests yourself
 
 ```bash
 npm test              # validation rules, no network, instant
@@ -427,7 +491,7 @@ npx expo-doctor        # project health
 
 ---
 
-## 13. Known limitations
+## 14. Known limitations
 
 Stated plainly, so none of these come as a surprise in a viva.
 

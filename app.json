@@ -3,14 +3,16 @@
     "name": "React Task 1",
     "slug": "react-task1",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
+      "requireFullScreen": false,
       "bundleIdentifier": "com.candavere.reacttask1"
     },
     "android": {
-      "package": "com.candavere.reacttask1"
+      "package": "com.candavere.reacttask1",
+      "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
       "bundler": "metro"
