@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native projects (Task 1 runs through Expo Go, no native folders needed)
+/android/
+/ios/
+
+# Local secrets. The Firebase *client* config here is not secret, but it is
+# personal to this project, so it stays out of git. See .env.example.
+/.env
+.env.local
+.env.*.local
+
+# macOS
+.DS_Store
+
+# The coursework brief itself - supplied by the module, not part of the code
+ReactNative_Task1.pdf
+
+# Logs
+npm-debug.*
+yarn-error.*
+*.log

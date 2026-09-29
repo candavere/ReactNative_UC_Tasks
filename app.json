@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "React Task 1",
+    "slug": "react-task1",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.candavere.reacttask1"
+    },
+    "android": {
+      "package": "com.candavere.reacttask1"
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}
